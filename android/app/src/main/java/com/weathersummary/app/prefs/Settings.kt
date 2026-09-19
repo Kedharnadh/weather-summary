@@ -16,6 +16,7 @@ object Settings {
     private const val K_WEATHER_PROVIDER = "weather_provider"
     private const val K_OWM_KEY = "owm_api_key"
     private const val K_WA_KEY = "weatherapi_api_key"
+    private const val K_WINDY_KEY = "windy_api_key"
     private const val K_AI_PROVIDER = "ai_provider"
     private const val K_GEMINI_KEY = "gemini_api_key"
     private const val K_GEMINI_MODEL = "gemini_model"
@@ -40,6 +41,7 @@ object Settings {
     private const val K_SUMMARY = "cache_summary"
     private const val K_UPDATED_AT = "cache_updated_at"
     private const val K_LAST_ERR = "cache_last_error"
+    private const val K_LAST_AI_ERR = "cache_last_ai_error"
     private const val K_FEELS = "cache_feels"
     private const val K_WIND = "cache_wind"
     private const val K_HUMIDITY = "cache_humidity"
@@ -69,6 +71,9 @@ object Settings {
     var weatherApiKey: String
         get() = sp.getString(K_WA_KEY, "") ?: ""
         set(v) = edit { putString(K_WA_KEY, v) }
+    var windyApiKey: String
+        get() = sp.getString(K_WINDY_KEY, "") ?: ""
+        set(v) = edit { putString(K_WINDY_KEY, v) }
 
     var aiProvider: String
         get() = sp.getString(K_AI_PROVIDER, AI_GEMINI) ?: AI_GEMINI
@@ -143,6 +148,10 @@ object Settings {
     var lastError: String
         get() = sp.getString(K_LAST_ERR, null) ?: ""
         set(v) = edit { putString(K_LAST_ERR, v) }
+    // non-blank when the last AI summary request failed and the fallback was used
+    var lastAiError: String
+        get() = sp.getString(K_LAST_AI_ERR, null) ?: ""
+        set(v) = edit { putString(K_LAST_AI_ERR, v) }
 
     var cachedFeelsC: Double
         get() = sp.getString(K_FEELS, null)?.toDoubleOrNull() ?: Double.NaN

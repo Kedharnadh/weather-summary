@@ -11,24 +11,24 @@
 
     <style name="Widget.WeatherSummary.Text" parent="android:Widget.TextView">
         <item name="android:textColor">@color/widget_text</item>
-        <item name="android:textSize">13sp</item>
+        <item name="android:textSize">12sp</item>
         <item name="android:fontFamily">sans-serif-medium</item>
         <item name="android:lineSpacingExtra">1dp</item>
     </style>
 
     <style name="Widget.WeatherSummary.Text.Headline" parent="Widget.WeatherSummary.Text">
-        <item name="android:textSize">26sp</item>
+        <item name="android:textSize">22sp</item>
         <item name="android:fontFamily">sans-serif-medium</item>
     </style>
 
     <style name="Widget.WeatherSummary.Text.Temp" parent="Widget.WeatherSummary.Text">
-        <item name="android:textSize">38sp</item>
+        <item name="android:textSize">32sp</item>
         <item name="android:fontFamily">sans-serif-condensed</item>
         <item name="android:lineSpacingExtra">0dp</item>
     </style>
 
     <style name="Widget.WeatherSummary.Text.Detail" parent="Widget.WeatherSummary.Text">
-        <item name="android:textSize">12sp</item>
+        <item name="android:textSize">11sp</item>
         <item name="android:fontFamily">sans-serif</item>
     </style>
 </resources>

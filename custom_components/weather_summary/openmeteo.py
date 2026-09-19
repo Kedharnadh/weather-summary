@@ -21,7 +21,9 @@ from .const import (
     PROVIDER_OPEN_METEO,
     PROVIDER_OPEN_WEATHER_MAP,
     PROVIDER_WEATHER_API_COM,
+    PROVIDER_WINDY,
     RAIN_THRESHOLD_MM,
+    WINDY_URL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -86,6 +88,12 @@ async def get_json(session: aiohttp.ClientSession, url: str) -> dict[str, Any]:
         return await resp.json(content_type=None)
 
 
+async def post_json(session: aiohttp.ClientSession, url: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async with session.post(url, json=payload, timeout=TIMEOUT) as resp:
+        resp.raise_for_status()
+        return await resp.json(content_type=None)
+
+
 async def fetch(
     session: aiohttp.ClientSession,
     provider: str,
@@ -93,6 +101,7 @@ async def fetch(
     lon: float,
     owm_key: str | None = None,
     wa_key: str | None = None,
+    windy_key: str | None = None,
 ) -> WeatherSnapshot:
     """Fetch and normalize from the configured provider."""
     if provider == PROVIDER_OPEN_METEO:
@@ -101,6 +110,8 @@ async def fetch(
         return await _fetch_open_weather_map(session, lat, lon, owm_key)
     if provider == PROVIDER_WEATHER_API_COM:
         return await _fetch_weather_api_com(session, lat, lon, wa_key)
+    if provider == PROVIDER_WINDY:
+        return await _fetch_windy(session, lat, lon, windy_key)
     raise ValueError(f"Unknown weather provider: {provider}")
 
 
@@ -217,6 +228,83 @@ async def _fetch_weather_api_com(
         ),
         minutely15=None,
         hourly=hours,
+    )
+
+
+async def _fetch_windy(
+    session: aiohttp.ClientSession, lat: float, lon: float, key: str | None
+) -> WeatherSnapshot:
+    if not key:
+        raise ValueError("Windy API key missing — add it in the integration options.")
+    payload = {
+        "lat": round(lat, 2),
+        "lon": round(lon, 2),
+        "model": "gfs",
+        "parameters": [
+            "temp", "rh", "wind", "windGust",
+            "precip", "snowPrecip", "lclouds", "mclouds", "hclouds",
+        ],
+        "levels": ["surface"],
+        "key": key,
+    }
+    data = await post_json(session, WINDY_URL, payload)
+    ts = data.get("ts") or []
+    series = {k: data.get(k) or [] for k in (
+        "temp-surface", "rh-surface", "wind_u-surface", "wind_v-surface",
+        "gust-surface", "past3hprecip-surface", "past3hsnowprecip-surface",
+        "lclouds-surface", "mclouds-surface", "hclouds-surface",
+    )}
+
+    def at(name: str, i: int) -> float | None:
+        v = series.get(name, [])
+        return v[i] if i < len(v) and v[i] is not None else None
+
+    def temp_c(i: int) -> float | None:
+        t = at("temp-surface", i)
+        return t - 273.15 if t is not None else None
+
+    def cloud(i: int) -> int | None:
+        vals = [x for x in (at("lclouds-surface", i), at("mclouds-surface", i), at("hclouds-surface", i)) if x is not None]
+        return round(max(vals)) if vals else None
+
+    def code(i: int) -> int:
+        precip = at("past3hprecip-surface", i) or 0.0
+        if precip >= RAIN_THRESHOLD_MM:
+            t = temp_c(i)
+            snow = at("past3hsnowprecip-surface", i) or 0.0
+            return 71 if ((t is not None and t < 0.0) or snow > 0.0) else 61
+        c = cloud(i) or 0
+        return 0 if c < 15 else (2 if c < 70 else 3)
+
+    def wind_kmh(i: int) -> float | None:
+        u = at("wind_u-surface", i)
+        v = at("wind_v-surface", i)
+        if u is None or v is None:
+            return None
+        return (u * u + v * v) ** 0.5 * 3.6
+
+    return WeatherSnapshot(
+        current=CurrentWeather(
+            temperature_c=temp_c(0) or 0.0,
+            apparent_temperature_c=None,
+            humidity_pct=round(at("rh-surface", 0)) if at("rh-surface", 0) is not None else None,
+            wind_kmh=wind_kmh(0),
+            weather_code=code(0),
+            precipitation_mm=at("past3hprecip-surface", 0),
+            is_day=None,
+            cloud_cover_pct=cloud(0),
+        ),
+        minutely15=None,
+        hourly=[
+            HourSlice(
+                time=str(t),
+                temperature_c=temp_c(i),
+                precip_probability_pct=None,
+                precip_mm=at("past3hprecip-surface", i),
+                weather_code=code(i),
+            )
+            for i, t in enumerate(ts)
+        ],
     )
 
 

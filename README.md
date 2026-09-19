@@ -87,11 +87,13 @@ key** (aistudio.google.com/apikey), use a local **Ollama** (no key), or point at
 your **Home Assistant** LLM. Free-tier Gemini ≈ 1,500 requests/day — a widget
 refreshing every 15 min uses ~96/day, so there's no practical limit.
 
-**Why Open-Meteo and not Windy?** Windy's *free* API is test-only (500/day,
+**Why Open-Meteo and not Windy?** Windy is available as an optional provider
+(both app and HA integration), but its *free* API is test-only (500/day,
 "randomly shuffled data") and excludes ECMWF; the accurate windy.com data needs
-the paid Professional tier. Open-Meteo blends ECMWF/ICON/GFS and adds 15-minute
-radar nowcasting — the thing that powers "rain in ~20 min". See `docs/RECIPE.md`
-§6 for how to add a Windy pro-key provider later (it's a one-interface change).
+the paid Professional tier. Its data is also 1-3-hourly, so it can't power the
+"rain in ~20 min" nowcast. Open-Meteo stays the default: it blends
+ECMWF/ICON/GFS and adds 15-minute radar nowcasting for free. See `docs/RECIPE.md`
+§6 for the details.
 
 ## Roadmap / extend
 

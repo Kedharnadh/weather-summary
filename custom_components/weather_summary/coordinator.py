@@ -42,6 +42,7 @@ class WeatherSummaryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 lon=self.config["longitude"],
                 owm_key=self.config.get("owm_api_key"),
                 wa_key=self.config.get("weatherapi_api_key"),
+                windy_key=self.config.get("windy_api_key"),
             )
         except Exception as err:  # noqa: BLE001
             self.last_error = str(err)

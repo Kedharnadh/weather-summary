@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Weather Summary",
-        "description": "Choose where the forecast comes from and which free LLM writes the short sentence. Open-Meteo needs no key; OpenWeatherMap and WeatherAPI.com use their free keys. For the LLM, 'OpenAI-compatible' covers Ollama (e.g. 192.168.1.50:11434/v1), 'Home Assistant' uses the LLM already configured in HA, 'None' uses a built-in template."
+        "description": "Choose where the forecast comes from and which free LLM writes the short sentence. Open-Meteo needs no key; OpenWeatherMap, WeatherAPI.com and Windy use their (free) keys — note Windy's free tier returns shuffled test data with 3-hourly rain. For the LLM, 'Gemini' takes a key from aistudio.google.com/apikey, 'OpenAI-compatible' covers Ollama (e.g. 192.168.1.50:11434/v1), 'Home Assistant' uses the LLM already configured in HA, 'None' uses a built-in template."
       },
       "options": {
         "title": "Weather Summary options",
@@ -12,7 +12,8 @@
     },
     "error": {
       "missing_key": "This weather provider needs an API key.",
-      "missing_url": "An LLM base URL is required for the OpenAI-compatible provider."
+      "missing_url": "An LLM base URL is required for the OpenAI-compatible provider.",
+      "missing_gemini_key": "A Gemini API key is required for the Gemini LLM provider."
     }
   },
   "options": {
@@ -24,7 +25,8 @@
     },
     "error": {
       "missing_key": "This weather provider needs an API key.",
-      "missing_url": "An LLM base URL is required for the OpenAI-compatible provider."
+      "missing_url": "An LLM base URL is required for the OpenAI-compatible provider.",
+      "missing_gemini_key": "A Gemini API key is required for the Gemini LLM provider."
     }
   }
 }

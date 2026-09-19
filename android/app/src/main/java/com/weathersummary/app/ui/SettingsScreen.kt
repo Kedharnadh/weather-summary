@@ -49,6 +49,7 @@ fun SettingsScreen(onBack: () -> Unit, onSaved: () -> Unit) {
     var weatherProvider by rememberSaveable { mutableStateOf(Settings.weatherProvider) }
     var owmKey by rememberSaveable { mutableStateOf(Settings.openWeatherApiKey) }
     var waKey by rememberSaveable { mutableStateOf(Settings.weatherApiKey) }
+    var windyKey by rememberSaveable { mutableStateOf(Settings.windyApiKey) }
 
     var aiProvider by rememberSaveable { mutableStateOf(Settings.aiProvider) }
     var geminiKey by rememberSaveable { mutableStateOf(Settings.geminiApiKey) }
@@ -104,6 +105,7 @@ fun SettingsScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                 Pair(WeatherProviders.OPEN_METEO, "Open-Meteo (no key)"),
                 Pair(WeatherProviders.OPEN_WEATHER_MAP, "OpenWeatherMap (free key)"),
                 Pair(WeatherProviders.WEATHER_API_COM, "WeatherAPI.com (free key)"),
+                Pair(WeatherProviders.WINDY, "Windy (free key, 3-hourly rain)"),
             ).forEach { (id, label) ->
                 OptionRow(label, id == weatherProvider) { weatherProvider = id }
             }
@@ -112,6 +114,15 @@ fun SettingsScreen(onBack: () -> Unit, onSaved: () -> Unit) {
             }
             if (weatherProvider == WeatherProviders.WEATHER_API_COM) {
                 SecretField(waKey, "WeatherAPI.com key") { waKey = it }
+            }
+            if (weatherProvider == WeatherProviders.WINDY) {
+                SecretField(windyKey, "Windy API key") { windyKey = it }
+                Text(
+                    "Free tier serves shuffled test data. Key at windy.com/docs/api.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
 
             SectionHeader("AI provider")
@@ -225,6 +236,7 @@ fun SettingsScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                     Settings.weatherProvider = weatherProvider
                     Settings.openWeatherApiKey = owmKey.trim()
                     Settings.weatherApiKey = waKey.trim()
+                    Settings.windyApiKey = windyKey.trim()
                     Settings.aiProvider = aiProvider
                     Settings.geminiApiKey = geminiKey.trim()
                     Settings.geminiModel = geminiModel.trim()

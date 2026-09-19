@@ -30,18 +30,30 @@ object WeatherRepository {
     private fun resolveLocation(context: Context): Pair<Double, Double> {
         if (Settings.useGps) {
             if (!LocationHelper.hasPermission(context)) {
-                throw IllegalStateException(
-                    context.getString(com.weathersummary.app.R.string.location_permission_needed)
-                )
+                return fixedLocation(context) {
+                    throw IllegalStateException(
+                        context.getString(com.weathersummary.app.R.string.location_permission_needed)
+                    )
+                }
             }
             LocationHelper.lastKnown(context)?.let { return it }
-            throw IllegalStateException("No location fix yet — open the app after granting location access.")
+            // No fresh fix (common for a background worker in Doze) — fall back to
+            // fixed coordinates if set, else fail so the widget can't go stale.
+            return fixedLocation(context) {
+                throw IllegalStateException(
+                    "No location fix yet — open the app after granting location access."
+                )
+            }
         }
-        val lat = Settings.latitude
-        val lon = Settings.longitude
-        if (lat == 0.0 && lon == 0.0) {
+        return fixedLocation(context) {
             throw IllegalStateException("Set a fixed latitude/longitude in Settings.")
         }
-        return lat to lon
+    }
+
+    private fun fixedLocation(context: Context, ifNothing: () -> Nothing): Pair<Double, Double> {
+        val lat = Settings.latitude
+        val lon = Settings.longitude
+        if (lat != 0.0 || lon != 0.0) return lat to lon
+        return ifNothing()
     }
 }

@@ -65,8 +65,11 @@ then restart Home Assistant.
 1. Settings → **Devices & Services** → Add integration → **Weather Summary**.
 2. Fill the form:
    - **Lat/Lon** — defaults to your HA home coordinates;
-   - **Weather provider** — Open-Meteo (no key) / OpenWeatherMap / WeatherAPI.com;
-   - **LLM provider** — `openai_compatible` (Ollama: `http://<host>:11434/v1`,
+   - **Weather provider** — Open-Meteo (no key) / OpenWeatherMap / WeatherAPI.com / Windy
+     (keyed ones need their free API key; Windy's free tier returns shuffled test data
+     with 3-hourly rain);
+   - **LLM provider** — `gemini` (needs a free key from aistudio.google.com/apikey) ·
+     `openai_compatible` (Ollama: `http://<host>:11434/v1`,
      model `llama3.2`; keys optional) · `homeassistant` (uses the LLM configured
      in HA) · `none` (built-in template, no AI);
    - **Scan interval** in minutes.

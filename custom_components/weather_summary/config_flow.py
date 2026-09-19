@@ -14,29 +14,34 @@ import homeassistant.helpers.config_validation as cv
 from .const import (
     CONF_LLM_API_KEY,
     CONF_LLM_BASE_URL,
+    CONF_LLM_GEMINI_KEY,
     CONF_LLM_MODEL,
     CONF_LLM_PROVIDER,
     CONF_OWM_API_KEY,
     CONF_TINY,
     CONF_WEATHER_PROVIDER,
     CONF_WA_API_KEY,
+    CONF_WINDY_API_KEY,
     DOMAIN,
     DEFAULT_SCAN_INTERVAL,
+    LLM_GEMINI,
     LLM_HOME_ASSISTANT,
     LLM_NONE,
     LLM_OPENAI_COMPAT,
     PROVIDER_OPEN_METEO,
     PROVIDER_OPEN_WEATHER_MAP,
     PROVIDER_WEATHER_API_COM,
+    PROVIDER_WINDY,
 )
 
 WEATHER_PROVIDER_OPTIONS = [
     PROVIDER_OPEN_METEO,
     PROVIDER_OPEN_WEATHER_MAP,
     PROVIDER_WEATHER_API_COM,
+    PROVIDER_WINDY,
 ]
 
-LLM_PROVIDER_OPTIONS = [LLM_NONE, LLM_OPENAI_COMPAT, LLM_HOME_ASSISTANT]
+LLM_PROVIDER_OPTIONS = [LLM_NONE, LLM_GEMINI, LLM_OPENAI_COMPAT, LLM_HOME_ASSISTANT]
 
 
 def weather_select() -> selector.SelectSelector:
@@ -71,6 +76,14 @@ class WeatherSummaryConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_WA_API_KEY
             ):
                 errors[CONF_WA_API_KEY] = "missing_key"
+            if user_input[CONF_WEATHER_PROVIDER] == PROVIDER_WINDY and not user_input.get(
+                CONF_WINDY_API_KEY
+            ):
+                errors[CONF_WINDY_API_KEY] = "missing_key"
+            if user_input[CONF_LLM_PROVIDER] == LLM_GEMINI and not user_input.get(
+                CONF_LLM_GEMINI_KEY
+            ):
+                errors[CONF_LLM_GEMINI_KEY] = "missing_gemini_key"
             if user_input[CONF_LLM_PROVIDER] == LLM_OPENAI_COMPAT and not user_input.get(
                 CONF_LLM_BASE_URL
             ):
@@ -87,6 +100,8 @@ class WeatherSummaryConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_LLM_PROVIDER: user_input[CONF_LLM_PROVIDER],
                         CONF_OWM_API_KEY: user_input.get(CONF_OWM_API_KEY) or "",
                         CONF_WA_API_KEY: user_input.get(CONF_WA_API_KEY) or "",
+                        CONF_WINDY_API_KEY: user_input.get(CONF_WINDY_API_KEY) or "",
+                        CONF_LLM_GEMINI_KEY: user_input.get(CONF_LLM_GEMINI_KEY) or "",
                         CONF_LLM_BASE_URL: user_input.get(CONF_LLM_BASE_URL) or "",
                         CONF_LLM_MODEL: user_input.get(CONF_LLM_MODEL) or "llama3.2",
                         CONF_LLM_API_KEY: user_input.get(CONF_LLM_API_KEY) or "",
@@ -108,7 +123,9 @@ class WeatherSummaryConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_WEATHER_PROVIDER, default=PROVIDER_OPEN_METEO): weather_select(),
                 vol.Optional(CONF_OWM_API_KEY): cv.string,
                 vol.Optional(CONF_WA_API_KEY): cv.string,
+                vol.Optional(CONF_WINDY_API_KEY): cv.string,
                 vol.Required(CONF_LLM_PROVIDER, default=LLM_OPENAI_COMPAT): llm_select(),
+                vol.Optional(CONF_LLM_GEMINI_KEY): cv.string,
                 vol.Optional(CONF_LLM_BASE_URL, default="http://localhost:11434/v1"): cv.string,
                 vol.Optional(CONF_LLM_MODEL, default="llama3.2"): cv.string,
                 vol.Optional(CONF_LLM_API_KEY): cv.string,
@@ -139,6 +156,14 @@ class WeatherSummaryOptionsFlow(OptionsFlow):
                 CONF_WA_API_KEY
             ):
                 errors[CONF_WA_API_KEY] = "missing_key"
+            if user_input[CONF_WEATHER_PROVIDER] == PROVIDER_WINDY and not user_input.get(
+                CONF_WINDY_API_KEY
+            ):
+                errors[CONF_WINDY_API_KEY] = "missing_key"
+            if user_input[CONF_LLM_PROVIDER] == LLM_GEMINI and not user_input.get(
+                CONF_LLM_GEMINI_KEY
+            ):
+                errors[CONF_LLM_GEMINI_KEY] = "missing_gemini_key"
             if user_input[CONF_LLM_PROVIDER] == LLM_OPENAI_COMPAT and not user_input.get(
                 CONF_LLM_BASE_URL
             ):
@@ -152,7 +177,9 @@ class WeatherSummaryOptionsFlow(OptionsFlow):
                 vol.Required(CONF_WEATHER_PROVIDER, default=current.get(CONF_WEATHER_PROVIDER, PROVIDER_OPEN_METEO)): weather_select(),
                 vol.Optional(CONF_OWM_API_KEY, default=current.get(CONF_OWM_API_KEY, "")): cv.string,
                 vol.Optional(CONF_WA_API_KEY, default=current.get(CONF_WA_API_KEY, "")): cv.string,
+                vol.Optional(CONF_WINDY_API_KEY, default=current.get(CONF_WINDY_API_KEY, "")): cv.string,
                 vol.Required(CONF_LLM_PROVIDER, default=current.get(CONF_LLM_PROVIDER, LLM_OPENAI_COMPAT)): llm_select(),
+                vol.Optional(CONF_LLM_GEMINI_KEY, default=current.get(CONF_LLM_GEMINI_KEY, "")): cv.string,
                 vol.Optional(
                     CONF_LLM_BASE_URL,
                     default=current.get(CONF_LLM_BASE_URL, "http://localhost:11434/v1"),

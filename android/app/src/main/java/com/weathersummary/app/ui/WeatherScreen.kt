@@ -230,6 +230,14 @@ private fun SummaryCard(state: WeatherUiState) {
                 modifier = Modifier.padding(top = 6.dp),
                 textAlign = TextAlign.Start,
             )
+            state.aiError?.let { err ->
+                Text(
+                    "AI: $err",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
         }
     }
 }

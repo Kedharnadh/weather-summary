@@ -4,6 +4,7 @@ import com.weathersummary.app.data.FallbackTemplates
 import com.weathersummary.app.data.ForecastFacts
 import com.weathersummary.app.data.WeatherFacts
 import com.weathersummary.app.data.WeatherSnapshot
+import com.weathersummary.app.prefs.Settings
 
 /** Contracts + prompt builder — mirrors docs/RECIPE.md exactly. */
 
@@ -79,16 +80,37 @@ object Summary {
     /**
      * Produce the sentence for display. Uses AI when configured; falls back to
      * a deterministic template otherwise so the widget is never empty.
+     * [Settings.lastAiError] is set when the AI request failed so the UI can
+     * surface why no AI sentence was produced.
      */
     suspend fun generate(snapshot: WeatherSnapshot, tiny: Boolean): String {
         val facts = ForecastFacts.derive(snapshot)
-        val ai = AiProviders.from(com.weathersummary.app.prefs.Settings.aiProvider)
+        val id = Settings.aiProvider
+        val ai = AiProviders.from(id)
         return try {
-            ai.summarize(facts, tiny)?.clean()?.takeIf { it.isNotEmpty() }
-                ?: FallbackTemplates.text(facts)
+            val text = ai.summarize(facts, tiny)?.clean()?.takeIf { it.isNotEmpty() }
+            if (text != null) {
+                Settings.lastAiError = ""
+                text
+            } else {
+                Settings.lastAiError = if (aiConfigured(id)) {
+                    "AI returned no text — check the key/model/network."
+                } else {
+                    "AI not configured — add a key in Settings."
+                }
+                FallbackTemplates.text(facts)
+            }
         } catch (e: Exception) {
+            Settings.lastAiError = (e.message ?: "AI provider error").take(160)
             FallbackTemplates.text(facts)
         }
+    }
+
+    private fun aiConfigured(id: String): Boolean = when (id) {
+        AiProviders.GEMINI -> Settings.geminiApiKey.isNotBlank()
+        AiProviders.OLLAMA -> Settings.ollamaUrl.isNotBlank()
+        AiProviders.HOME_ASSISTANT -> Settings.haToken.isNotBlank()
+        else -> false
     }
 }
 

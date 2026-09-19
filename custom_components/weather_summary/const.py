@@ -11,10 +11,12 @@ PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
 CONF_WEATHER_PROVIDER = "weather_provider"
 CONF_OWM_API_KEY = "owm_api_key"
 CONF_WA_API_KEY = "weatherapi_api_key"
+CONF_WINDY_API_KEY = "windy_api_key"
 CONF_LLM_PROVIDER = "llm_provider"
 CONF_LLM_BASE_URL = "llm_base_url"
 CONF_LLM_MODEL = "llm_model"
 CONF_LLM_API_KEY = "llm_api_key"
+CONF_LLM_GEMINI_KEY = "gemini_api_key"
 CONF_URL = "url"
 CONF_TOKEN = "token"  # reserved for future push-auth (app already uses its own token)
 CONF_TINY = "tiny_sentence"
@@ -23,11 +25,13 @@ CONF_TINY = "tiny_sentence"
 PROVIDER_OPEN_METEO = "openmeteo"
 PROVIDER_OPEN_WEATHER_MAP = "openweathermap"
 PROVIDER_WEATHER_API_COM = "weatherapi"
+PROVIDER_WINDY = "windy"
 
 # LLM providers
 LLM_NONE = "none"
 LLM_OPENAI_COMPAT = "openai_compatible"
 LLM_HOME_ASSISTANT = "homeassistant"
+LLM_GEMINI = "gemini"
 
 # Defaults
 DEFAULT_SCAN_INTERVAL = 15
@@ -36,6 +40,8 @@ MIN_SCAN_INTERVAL = 5
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 OPEN_WEATHER_MAP_URL = "https://api.openweathermap.org/data/3.0/onecall"
 WEATHER_API_COM_URL = "https://api.weatherapi.com/v1/forecast.json"
+WINDY_URL = "https://api.windy.com/api/point-forecast/v2"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta"
 
 # Open-Meteo weather codes (mirrors docs/RECIPE.md)
 WMO_KEYS = {

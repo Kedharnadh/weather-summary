@@ -100,23 +100,30 @@ See `WeatherCodes` (android) / `WMO` dict (ha) — keep them in sync.
 
 ## 6. Notes on Windy as a provider
 
-Windy itself exposes a **Point Forecast API** (`POST https://api.windy.com/api/point-forecast/v2`
+Windy exposes a **Point Forecast API** (`POST https://api.windy.com/api/point-forecast/v2`
 with `{"lat","lon","model","parameters","levels","key"}`, forecasting the full run ahead),
 which is why people find windy.com accurate:
 
-- The **free “Testing” tier is dev-only**: 500 requests/day and the docs state it
-  *“returns randomly shuffled and slightly modified data”*. Not usable for real locations.
+- The **free "Testing" tier is dev-only**: 500 requests/day and the docs state it
+  *"returns randomly shuffled and slightly modified data"*. Not usable for real locations.
 - **ECMWF is not available** in Point Forecast at any tier; free-tier models are GFS,
   ICON-global (`icon`), AROME, NAM, CAMS etc.
 - The accurate panel you see on windy.com is ECMWF/HRRR-style data behind the
   **Professional** tier.
 
-Recommendation: keep **Open-Meteo** as the default. It already blends ECMWF / ICON / GFS
-(and lets you pin a model via `&models=`), and its `minutely_15` radar/satellite nowcast is
-what actually powers the “rain in ~20 min” sentences — Windy's hourly model output can't
-give that granularity. If you later obtain a **Professional** key, adding Windy is a small
-change: implement the `WeatherProvider` interface in the app and a matching branch in
-`openmeteo.py` (HA), then map the response into the `WeatherSnapshot` shape above.
+Windy is now implemented as a provider (app + HA) so the plumbing is real. Details:
+
+- Model used: `gfs`; levels `["surface"]`. Response is `ts` (epoch-ms steps) plus one
+  array per `parameter-surface` key. `temp` is Kelvin (subtract 273.15), `wind` arrives
+  as `wind_u`/`wind_v` components (speed = √(u²+v²)), and precipitation is
+  **`past3hprecip` — 3-hour accumulated buckets**.
+- Because of that bucket size, Windy **cannot** power "rain in ~20 min" nowcasts; expect
+  the rain start/stop to land on 3-hour boundaries with this provider.
+
+Recommendation: keep **Open-Meteo** as the default. It blends ECMWF / ICON / GFS (and
+lets you pin a model via `&models=`), and its `minutely_15` radar/satellite nowcast is
+what actually powers the "rain in ~20 min" sentences. A Windy **Professional** key slots
+into the existing provider with no code changes.
 
 ## 7. Free AI limits (verified vs. the providers' docs)
 

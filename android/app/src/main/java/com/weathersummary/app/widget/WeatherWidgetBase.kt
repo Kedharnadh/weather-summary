@@ -13,13 +13,12 @@ import android.graphics.PorterDuff
 import android.graphics.drawable.Drawable
 import android.widget.RemoteViews
 import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.weathersummary.app.MainActivity
 import com.weathersummary.app.R
 import com.weathersummary.app.prefs.Settings
+import com.weathersummary.app.work.AlarmRefreshReceiver
 import com.weathersummary.app.work.WeatherRefreshWorker
 import java.util.concurrent.TimeUnit
 
@@ -72,7 +71,6 @@ abstract class WeatherWidgetBase : AppWidgetProvider() {
         )
 
         private const val UNIQUE_NAME = "weather_refresh"
-        private const val IMMEDIATE_NAME = "widget_immediate"
 
         fun schedule(context: Context) {
             val minutes = Settings.intervalMinutes.coerceAtLeast(15L)
@@ -82,14 +80,12 @@ abstract class WeatherWidgetBase : AppWidgetProvider() {
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 UNIQUE_NAME, ExistingPeriodicWorkPolicy.UPDATE, request
             )
+            AlarmRefreshReceiver.schedule(context)
         }
 
         /** Fill data quickly (first add / theme / transparency change) instead of waiting. */
         fun refreshNow(context: Context) {
-            val request = OneTimeWorkRequestBuilder<WeatherRefreshWorker>().build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                IMMEDIATE_NAME, ExistingWorkPolicy.REPLACE, request
-            )
+            WeatherRefreshWorker.refreshNow(context)
         }
 
         fun updateAll(context: Context) {

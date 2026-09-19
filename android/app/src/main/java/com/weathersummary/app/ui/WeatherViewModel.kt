@@ -26,6 +26,7 @@ data class WeatherUiState(
     val weatherCode: Int = 0,
     val isDay: Boolean? = null,
     val updatedAtMs: Long = 0,
+    val aiError: String? = null,
 ) {
     val hasData: Boolean get() = summary.isNotBlank() || tempC.isFinite()
 }
@@ -108,6 +109,7 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
                         isDay = result.snapshot.current.isDay,
                         updatedAtMs = System.currentTimeMillis(),
                         error = null,
+                        aiError = Settings.lastAiError.ifBlank { null },
                     )
                 }
             } catch (e: Exception) {

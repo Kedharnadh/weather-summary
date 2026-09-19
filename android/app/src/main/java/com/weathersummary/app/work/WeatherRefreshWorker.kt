@@ -3,6 +3,8 @@ package com.weathersummary.app.work
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -58,6 +60,7 @@ class WeatherRefreshWorker(context: Context, params: WorkerParameters) :
 
     companion object {
         private const val UNIQUE_NAME = "weather_refresh"
+        private const val IMMEDIATE_NAME = "widget_immediate"
 
         fun schedule(context: Context) {
             val minutes = Settings.intervalMinutes.coerceAtLeast(15L)
@@ -66,6 +69,15 @@ class WeatherRefreshWorker(context: Context, params: WorkerParameters) :
             ).build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 UNIQUE_NAME, ExistingPeriodicWorkPolicy.UPDATE, request
+            )
+            AlarmRefreshReceiver.schedule(context)
+        }
+
+        /** Fill data quickly (widget add / theme change / alarm tick) instead of waiting. */
+        fun refreshNow(context: Context) {
+            val request = OneTimeWorkRequestBuilder<WeatherRefreshWorker>().build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                IMMEDIATE_NAME, ExistingWorkPolicy.REPLACE, request
             )
         }
 

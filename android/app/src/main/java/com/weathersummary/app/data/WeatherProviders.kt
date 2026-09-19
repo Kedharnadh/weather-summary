@@ -28,11 +28,13 @@ object WeatherProviders {
     const val OPEN_METEO = "openmeteo"
     const val OPEN_WEATHER_MAP = "openweathermap"
     const val WEATHER_API_COM = "weatherapi"
+    const val WINDY = "windy"
 
     fun all(): List<WeatherProvider> = listOf(
         OpenMeteoProvider(),
         OpenWeatherMapProvider(),
         WeatherApiComProvider(),
+        WindyProvider(),
     )
 
     fun from(settings: Settings): WeatherProvider =
@@ -331,3 +333,103 @@ internal class WeatherApiComProvider : WeatherProvider {
 }
 
 internal fun gson(): com.google.gson.Gson = com.google.gson.Gson()
+
+// ---------------------------------------------------------------------------
+// 4. Windy — Point Forecast API v2 (free test data, requires key)
+// ---------------------------------------------------------------------------
+
+internal const val WINDY_URL = "https://api.windy.com/api/point-forecast/v2"
+
+internal class WindyProvider : WeatherProvider {
+    override val id = WeatherProviders.WINDY
+    override val requiresApiKey = true
+
+    override suspend fun fetch(lat: Double, lon: Double): WeatherSnapshot {
+        val key = Settings.windyApiKey
+        check(key.isNotBlank()) { "Windy API key missing — add it in Settings." }
+        val body = gson().toJson(
+            mapOf(
+                "lat" to (Math.round(lat * 100) / 100.0),
+                "lon" to (Math.round(lon * 100) / 100.0),
+                "model" to "gfs",
+                "parameters" to listOf(
+                    "temp", "rh", "wind", "windGust",
+                    "precip", "snowPrecip", "lclouds", "mclouds", "hclouds",
+                ),
+                "levels" to listOf("surface"),
+                "key" to key,
+            )
+        )
+        val root = gson().fromJson(Http.postJson(WINDY_URL, body), Map::class.java)
+
+        @Suppress("UNCHECKED_CAST")
+        val ts = ((root["ts"] as? List<*>) ?: emptyList<Any?>())
+            .mapNotNull { (it as? Number)?.toLong() }
+
+        fun arr(key: String): List<Double> =
+            ((root[key] as? List<*>) ?: emptyList<Any?>()).mapNotNull { (it as? Number)?.toDouble() }
+
+        val tempK = arr("temp-surface")
+        val hum = arr("rh-surface")
+        val windU = arr("wind_u-surface")
+        val windV = arr("wind_v-surface")
+        val gust = arr("gust-surface")
+        val precip = arr("past3hprecip-surface")
+        val snow = arr("past3hsnowprecip-surface")
+        val lClouds = arr("lclouds-surface")
+        val mClouds = arr("mclouds-surface")
+        val hClouds = arr("hclouds-surface")
+
+        fun at(list: List<Double>, i: Int): Double? = list.getOrNull(i)?.takeIf { !it.isNaN() }
+        fun tempCAt(i: Int): Double? = at(tempK, i)?.let { it - 273.15 }
+        fun cloudAt(i: Int): Int? {
+            val l = at(lClouds, i); val m = at(mClouds, i); val h = at(hClouds, i) ?: 0.0
+            if (l == null && m == null) return null
+            return maxOf(l ?: m ?: 0.0, m ?: l ?: 0.0, h).toInt().coerceIn(0, 100)
+        }
+        fun codeAt(i: Int): Int {
+            val precipNow = at(precip, i) ?: 0.0
+            if (precipNow >= 0.1) {
+                val t = tempCAt(i)
+                val sn = at(snow, i) ?: 0.0
+                return if ((t != null && t < 0.0) || sn > 0.0) 71 else 61
+            }
+            val cloud = cloudAt(i) ?: 0
+            return when {
+                cloud < 15 -> 0
+                cloud < 70 -> 2
+                else -> 3
+            }
+        }
+
+        fun currentWindKmh(): Double? {
+            val u = windU.getOrNull(0) ?: return null
+            val v = windV.getOrNull(0) ?: return null
+            return Math.sqrt(u * u + v * v) * 3.6
+        }
+
+        return WeatherSnapshot(
+            current = CurrentWeather(
+                temperatureC = tempCAt(0) ?: Double.NaN,
+                apparentTemperatureC = null,
+                humidityPct = at(hum, 0)?.let { it.toInt().coerceIn(0, 100) },
+                windKmh = currentWindKmh(),
+                weatherCode = codeAt(0),
+                precipitationMm = at(precip, 0),
+                isDay = null,
+                cloudCoverPct = cloudAt(0),
+            ),
+            minutely15 = null,
+            hourly = ts.mapIndexedNotNull { i, epochMs ->
+                val t = tempCAt(i) ?: return@mapIndexedNotNull null
+                HourSlice(
+                    time = java.time.Instant.ofEpochMilli(epochMs).toString(),
+                    temperatureC = t,
+                    precipProbabilityPct = null,
+                    precipMm = at(precip, i),
+                    weatherCode = codeAt(i),
+                )
+            },
+        )
+    }
+}

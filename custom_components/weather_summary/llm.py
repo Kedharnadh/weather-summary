@@ -1,10 +1,11 @@
 """LLM text generation for weather summaries.
 
-Mirrors the Android `ai/PromptBuilder.kt` and `ai/Providers.kt`. Supports three
+Mirrors the Android `ai/PromptBuilder.kt` and `ai/Providers.kt`. Supports four
 backends, chosen in the config flow:
 
 - "openai_compatible": any OpenAI-compatible chat endpoint (Ollama exposes one
-  at <host>:11434/v1). API key optional.
+  at e.g. 192.168.1.50:11434/v1). API key optional.
+- "gemini": Google Gemini REST API (needs a key from aistudio.google.com/apikey).
 - "homeassistant": use Home Assistant's configured LLM (get_ai_llm).
 - "none": no AI — sensors always carry the deterministic fallback sentence.
 """
@@ -17,6 +18,9 @@ from typing import Any
 import aiohttp
 
 from .const import (
+    CONF_LLM_GEMINI_KEY,
+    GEMINI_URL,
+    LLM_GEMINI,
     LLM_HOME_ASSISTANT,
     LLM_NONE,
     LLM_OPENAI_COMPAT,
@@ -82,6 +86,8 @@ async def generate_text(hass, config: dict[str, Any], prompt: str, tiny: bool) -
     """Generate a short sentence from a prompt using the configured backend."""
     provider = config.get("llm_provider", LLM_NONE)
     try:
+        if provider == LLM_GEMINI:
+            return await _gemini(config, prompt)
         if provider == LLM_OPENAI_COMPAT:
             return await _openai_compatible(config, prompt)
         if provider == LLM_HOME_ASSISTANT:
@@ -137,3 +143,29 @@ async def _home_assistant_llm(hass, prompt: str) -> str | None:
     response = await llm.async_generate(prompt)
     content = getattr(response, "text", None) or getattr(response, "content", None)
     return str(content) if content else None
+
+
+async def _gemini(config: dict[str, Any], prompt: str) -> str | None:
+    """Call the Gemini REST API (v1beta generateContent)."""
+    api_key = config.get(CONF_LLM_GEMINI_KEY) or config.get("gemini_api_key")
+    if not api_key:
+        _LOGGER.warning("Gemini provider selected but no API key configured")
+        return None
+    model = config.get("llm_model") or "gemini-2.5-flash"
+    url = f"{GEMINI_URL}/models/{model}:generateContent?key={api_key}"
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": 140, "temperature": 0.4},
+    }
+    headers = {"Content-Type": "application/json"}
+
+    async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
+        async with session.post(url, json=payload, headers=headers) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+    try:
+        parts = (data["candidates"][0].get("content") or {}).get("parts") or []
+        text = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
+        return text.strip() or None
+    except (KeyError, IndexError, TypeError):
+        return None
