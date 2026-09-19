@@ -1,7 +1,5 @@
 {
   "name": "Weather Summary",
-  "domain": "weather_summary",
   "homeassistant": "2024.1.0",
-  "render_readme": true,
-  "iot_class": "cloud_polling"
+  "render_readme": true
 }
