@@ -8,6 +8,7 @@ import time
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import CONF_WEATHER_PROVIDER, DOMAIN, PROVIDER_OPEN_METEO
@@ -33,7 +34,7 @@ class WeatherSummaryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.last_error: str | None = None
 
     async def _async_update_data(self) -> dict[str, Any]:
-        session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+        session = async_get_clientsession(self.hass)
         try:
             snapshot = await openmeteo.fetch(
                 session=session,
@@ -54,7 +55,7 @@ class WeatherSummaryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.last_error = None
         try:
             self.summary = await llm.summarize(
-                self.hass, self.config, facts, bool(self.config.get("tiny_sentence", False))
+                self.hass, self.config, facts, llm.sentence_mode(self.config)
             )
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("Summary generation failed: %s", err)
