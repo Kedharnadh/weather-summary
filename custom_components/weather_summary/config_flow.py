@@ -9,7 +9,6 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_SCAN_INTERVAL
 from homeassistant.helpers import selector
-from homeassistant.helpers.selector import SelectorValue
 import homeassistant.helpers.config_validation as cv
 
 from .const import (
@@ -54,12 +53,11 @@ def sentence_mode_select() -> selector.SelectSelector:
     return selector.SelectSelector(
         selector.SelectSelectorConfig(
             options=[
-                SelectorValue(value=SENTENCE_TINY, label="Tiny (≤ 60 chars)"),
-                SelectorValue(value=SENTENCE_SHORT, label="Short (≤ 100 chars)"),
-                SelectorValue(value=SENTENCE_LONG, label="Long (≤ 240 chars)"),
+                "tiny", "short", "long",
             ],
             mode=selector.SelectSelectorMode.DROPDOWN,
-        )
+        ),
+        translation_key="sentence_mode",
     )
 
 
