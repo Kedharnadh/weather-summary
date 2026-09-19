@@ -178,11 +178,9 @@ async def _gemini(config: dict[str, Any], prompt: str) -> str | None:
     if not api_key:
         _LOGGER.warning("Gemini provider selected but no API key configured")
         return None
-    model = (
-        config.get(CONF_LLM_GEMINI_MODEL)
-        or config.get("llm_model")
-        or DEFAULT_GEMINI_MODEL
-    )
+    # Use the Gemini-specific model. Never fall back to "llm_model" — that one
+    # is the OpenAI-compatible setting (default llama3.2) and Gemini 404s on it.
+    model = config.get(CONF_LLM_GEMINI_MODEL) or DEFAULT_GEMINI_MODEL
     url = f"{GEMINI_URL}/models/{model}:generateContent?key={api_key}"
     payload = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
