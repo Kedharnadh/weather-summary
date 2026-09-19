@@ -6,19 +6,31 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.weathersummary.app.prefs.Settings
 
 /**
  * AlarmManager-driven refresh so widget updates survive Doze and aggressive
  * battery optimizers (OnePlus/OxygenOS etc.) that defer WorkManager batches.
- * Uses an exact allow-while-idle alarm where permitted and re-arms itself after
- * each firing.
+ * Runs the refresh inline (goAsync + IO coroutine) instead of handing back to
+ * WorkManager, so the tick always produces a fresh widget. Re-arms itself.
  */
 class AlarmRefreshReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION) return
-        WeatherRefreshWorker.refreshNow(context)
+        val result = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                WeatherRefreshWorker.refreshAndPersist(context)
+            } catch (_: Exception) {
+                // Keep stale cache; next tick retries. Setting lastError hides errors
+                // from the widget so the previous text stays readable.
+            }
+            result.finish()
+        }
         schedule(context)
     }
 

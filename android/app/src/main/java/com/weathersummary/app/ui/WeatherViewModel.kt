@@ -8,6 +8,7 @@ import com.weathersummary.app.data.WeatherFacts
 import com.weathersummary.app.data.WeatherRepository
 import com.weathersummary.app.data.WeatherSnapshot
 import com.weathersummary.app.prefs.Settings
+import com.weathersummary.app.widget.WeatherWidgetBase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -97,6 +98,7 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
                 Settings.cachedWindKmh = result.facts.windKmh ?: Double.NaN
                 Settings.cachedHumidityPct = result.facts.humidityPct ?: -1
                 Settings.cachedCloudPct = result.snapshot.current.cloudCoverPct ?: -1
+                WeatherWidgetBase.updateAll(getApplication())
                 _state.update {
                     it.copy(
                         loading = false,
