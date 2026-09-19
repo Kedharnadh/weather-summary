@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Weather Summary",
-        "description": "Choose where the forecast comes from and which free LLM writes the short sentence. Open-Meteo needs no key; OpenWeatherMap and WeatherAPI.com use their free keys. For the LLM, 'OpenAI-compatible' covers Ollama (<host>:11434/v1), 'Home Assistant' uses the LLM already configured in HA, 'None' uses a built-in template."
+        "description": "Choose where the forecast comes from and which free LLM writes the short sentence. Open-Meteo needs no key; OpenWeatherMap and WeatherAPI.com use their free keys. For the LLM, 'OpenAI-compatible' covers Ollama (e.g. 192.168.1.50:11434/v1), 'Home Assistant' uses the LLM already configured in HA, 'None' uses a built-in template."
       },
       "options": {
         "title": "Weather Summary options",
