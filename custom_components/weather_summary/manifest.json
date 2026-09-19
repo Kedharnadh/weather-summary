@@ -1,13 +1,13 @@
 {
   "domain": "weather_summary",
   "name": "Weather Summary",
+  "after_dependencies": ["http"],
   "codeowners": ["@kedharnadh"],
   "config_flow": true,
   "documentation": "https://github.com/kedharnadh/weather-summary",
-  "issue_tracker": "https://github.com/kedharnadh/weather-summary/issues",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "after_dependencies": ["http"],
-  "version": "1.0.0",
-  "requirements": []
+  "issue_tracker": "https://github.com/kedharnadh/weather-summary/issues",
+  "requirements": [],
+  "version": "1.0.0"
 }
