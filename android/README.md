@@ -35,7 +35,7 @@ the phone, so the widget works even if you never set up Home Assistant.
 - Toggle **Push to HA** to have the app post its latest forecast + sentence to the
   `weather_summary` integration as soon as it refreshes.
 
-Both need a long-lived token from HA (Profile → Security → **Long-Lived Access Tokens**) and the HA URL. Install the integration first — see `ha/README.md`.
+Both need a long-lived token from HA (Profile → Security → **Long-Lived Access Tokens**) and the HA URL. Install the integration first — see `docs/HA-INTEGRATION.md`.
 
 ## Source layout
 

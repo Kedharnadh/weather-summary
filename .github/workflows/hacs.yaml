@@ -14,13 +14,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Stage integration at repo root
-        run: |
-          cp -r ha/custom_components custom_components
-          cp ha/hacs.json hacs.json
-          cp ha/LICENSE LICENSE
-          cp ha/README.md README.md
-
       - name: HACS validation
         uses: hacs/action@main
         with:
@@ -35,7 +28,6 @@ jobs:
 
       - name: Hassfest validation
         run: |
-          cp -r ha/custom_components custom_components
           docker run --rm \
             -v "${{ github.workspace }}:/github/workspace" \
             ghcr.io/home-assistant/hassfest:latest

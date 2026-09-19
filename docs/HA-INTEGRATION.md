@@ -29,25 +29,39 @@ configure.
 
 ## Installation
 
-HACS expects `custom_components` at the **repository root**, so this monorepo
-(`android/` + `ha/`) is not HACS-installable as-is. Pick either:
+The component lives at the **root of this repository**
+(`custom_components/weather_summary`), so it installs as an HACS **custom
+repository** — no need for a separate repo.
 
-1. **Manual (quickest)** — copy the folder into your config:
-   ```
-   config/
-     custom_components/
-       weather_summary/   ← from ha/custom_components/weather_summary
-   ```
-   then restart Home Assistant and add **Weather Summary** via Settings →
-   Devices & Services.
+### HACS (custom repository)
 
-2. **HACS** — push the `ha/` folder to its own GitHub repository (like
-   `weather-summary-ha`, mirroring the companion app repo), then add it as a
-   custom repository with category **Integration**. The included GitHub
-   workflows stage the `ha/` contents at the repo root before running HACS
-   validation / hassfest, so a repo root == `ha/` layout validates cleanly.
+1. In Home Assistant, open **HACS** → click the three dots (top right) →
+   **Custom repositories**.
+2. Add `https://github.com/Kedharnadh/weather-summary` with category
+   **Integration**, then **Add**.
+3. HACS (Integrations) → **Weather Summary** → **Download** → restart
+   Home Assistant.
+4. New versions arrive as GitHub releases: tag any commit `vX.Y.Z` and HACS
+   offers the update.
 
-Setup steps in both cases:
+One-tap add (jumps straight to the HACS "add custom repository" dialog):
+
+[![Open your Home Assistant instance and add this repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Kedharnadh&repository=weather-summary&category=integration)
+
+### Manual
+
+Copy the folder into your config:
+
+```
+config/
+  custom_components/
+    weather_summary/   ← from custom_components/weather_summary
+```
+
+then restart Home Assistant.
+
+### Setup steps (both methods)
+
 1. Settings → **Devices & Services** → Add integration → **Weather Summary**.
 2. Fill the form:
    - **Lat/Lon** — defaults to your HA home coordinates;
