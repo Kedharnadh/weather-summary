@@ -57,8 +57,6 @@ _EXAMPLES_BY_MODE = {"tiny": EXAMPLES_TINY, "short": EXAMPLES_SHORT, "long": EXA
 
 VALID_MODES = set(_MAX_BY_MODE)
 
-_MODE_LABEL = {"tiny": "Tiny (≤ 60 chars)", "short": "Short (≤ 100 chars)", "long": "Long (≤ 240 chars)"}
-
 
 def sentence_mode(config: dict[str, Any]) -> str:
     """Current sentence mode, migrating the legacy tiny_sentence boolean."""
