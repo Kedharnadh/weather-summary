@@ -1,0 +1,30 @@
+generate:
+  name: Generate weather sentence
+  description: "Generates a short weather sentence from a prompt using the configured LLM. Use it from the Android app or scripts."
+  fields:
+    prompt:
+      name: Prompt
+      description: "The prompt containing the weather facts (same recipe as the Android app)."
+      required: true
+      example: "Facts: current: 28.1°, raining_now: false, rain_start_in_min: 20 ..."
+      selector:
+        text:
+          multiline: true
+    tiny:
+      name: Tiny
+      description: "Restrict output to <=60 characters (best for phone widgets)."
+      default: false
+      selector:
+        boolean:
+
+ingest_app:
+  name: Ingest app data
+  description: "Adopt weather data + sentence pushed from the Android app, keeping the sensors fresh without polling."
+  fields:
+    payload:
+      name: Payload
+      description: "Weather and summary key-value pairs from the phone (temperature, summary, weather_code, is_raining, rain_start_in_min, ...)."
+      required: true
+      selector:
+        object:
+          multiple: false

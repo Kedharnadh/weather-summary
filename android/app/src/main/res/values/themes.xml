@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.WeatherSummary" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="Widget.WeatherSummary" parent="android:Widget">
+        <item name="android:background">@color/widget_bg</item>
+    </style>
+
+    <style name="Widget.WeatherSummary.Text" parent="android:Widget.TextView">
+        <item name="android:textColor">@color/widget_text</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:lineSpacingExtra">1dp</item>
+    </style>
+
+    <style name="Widget.WeatherSummary.Text.Headline" parent="Widget.WeatherSummary.Text">
+        <item name="android:textSize">26sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="Widget.WeatherSummary.Text.Temp" parent="Widget.WeatherSummary.Text">
+        <item name="android:textSize">38sp</item>
+        <item name="android:fontFamily">sans-serif-condensed</item>
+        <item name="android:lineSpacingExtra">0dp</item>
+    </style>
+
+    <style name="Widget.WeatherSummary.Text.Detail" parent="Widget.WeatherSummary.Text">
+        <item name="android:textSize">12sp</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+</resources>

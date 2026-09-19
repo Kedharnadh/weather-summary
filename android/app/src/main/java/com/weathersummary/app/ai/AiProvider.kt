@@ -1,0 +1,99 @@
+package com.weathersummary.app.ai
+
+import com.weathersummary.app.data.FallbackTemplates
+import com.weathersummary.app.data.ForecastFacts
+import com.weathersummary.app.data.WeatherFacts
+import com.weathersummary.app.data.WeatherSnapshot
+
+/** Contracts + prompt builder — mirrors docs/RECIPE.md exactly. */
+
+interface AiProvider {
+    val id: String
+    /** Returns the sentence, or null if it must be retried / cannot be produced. */
+    suspend fun summarize(facts: WeatherFacts, tiny: Boolean): String?
+}
+
+object AiProviders {
+    const val GEMINI = "gemini"
+    const val OLLAMA = "ollama"
+    const val HOME_ASSISTANT = "homeassistant"
+
+    fun from(id: String): AiProvider = when (id) {
+        GEMINI -> GeminiAiProvider()
+        OLLAMA -> OllamaAiProvider()
+        HOME_ASSISTANT -> HomeAssistantAiProvider()
+        else -> GeminiAiProvider()
+    }
+}
+
+object PromptBuilder {
+
+    val exampleShort = listOf(
+        "Rain starting in ~20 min, umbrella time.",
+        "Light rain easing, should stop in ~10 min.",
+        "Clear 26°, breezy; chance of drizzle after 6 pm.",
+        "Sunny and hot, 34°; storms possible late evening.",
+    )
+
+    val exampleTiny = listOf(
+        "Rain in ~20 min.",
+        "Rain stops in ~10 min.",
+        "Clear 26°, breezy.",
+        "Hot 34°; storms late.",
+    )
+
+    fun build(facts: WeatherFacts, tiny: Boolean): String {
+        val max = if (tiny) 60 else 100
+        val examples = if (tiny) exampleTiny else exampleShort
+
+        val line = StringBuilder()
+        line.append("You write phone-widget weather sentences. Rules:\n")
+        line.append("- ONE sentence, max $max characters, no emoji, no greeting, no units (write \"28°\").\n")
+        line.append("- Prioritise (in order): rain starting/stopping soon, extreme heat/cold, heavy wind/storm, otherwise keep it neutral.\n")
+        line.append("- Only mention things that are actually true from the facts.\n")
+        line.append("- Speak in present/next-hour terms.\n")
+        line.append("Examples:\n")
+        examples.forEach { line.append("- \"").append(it).append("\"\n") }
+        line.append("\nFacts:\n")
+        line.append("current: ${"%.1f".format(facts.tempC)}°")
+        facts.feelsC?.let { line.append(" (feels ${"%.1f".format(it)}°)") }
+        facts.humidityPct?.let { line.append(", humidity ${it}%") }
+        facts.windKmh?.let { line.append(", wind ${"%.0f".format(it)} km/h") }
+        line.append(", condition: ${facts.conditionLabel.lowercase()}\n")
+        line.append("raining_now: ${facts.isRainingNow}\n")
+        line.append("rain_start_in_min: ${facts.rainStartInMin ?: "none"}\n")
+        line.append("rain_stop_in_min: ${facts.rainStopInMin ?: "none"}\n")
+        line.append("precip_next_hour_mm: ${"%.1f".format(facts.precipNextHourMm)}\n")
+        facts.maxChanceRain24h?.let {
+            line.append("max_chance_rain_next_24h: ${it.first}% at ${it.second}\n")
+        }
+        facts.peakTemp24h?.let {
+            line.append("peak_temp_next_24h: ${"%.0f".format(it.first)}° at ${it.second}\n")
+        }
+        line.append("\nOnly output the sentence.")
+        return line.toString()
+    }
+}
+
+object Summary {
+    /**
+     * Produce the sentence for display. Uses AI when configured; falls back to
+     * a deterministic template otherwise so the widget is never empty.
+     */
+    suspend fun generate(snapshot: WeatherSnapshot, tiny: Boolean): String {
+        val facts = ForecastFacts.derive(snapshot)
+        val ai = AiProviders.from(com.weathersummary.app.prefs.Settings.aiProvider)
+        return try {
+            ai.summarize(facts, tiny)?.clean()?.takeIf { it.isNotEmpty() }
+                ?: FallbackTemplates.text(facts)
+        } catch (e: Exception) {
+            FallbackTemplates.text(facts)
+        }
+    }
+}
+
+private fun String.clean(): String = trim()
+    .removePrefix("\"")
+    .removeSuffix("\"")
+    .replace("\n", " ")
+    .trim()

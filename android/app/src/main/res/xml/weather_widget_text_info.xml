@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_label_text"
+    android:previewImage="@drawable/ic_weather_partly_cloudy"
+    android:previewLayout="@layout/widget_weather_text_preview"
+    android:initialLayout="@layout/widget_weather_text_dark_solid"
+    android:minWidth="250dp"
+    android:minHeight="60dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />

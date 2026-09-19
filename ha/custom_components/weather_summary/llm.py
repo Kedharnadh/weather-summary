@@ -1,0 +1,139 @@
+"""LLM text generation for weather summaries.
+
+Mirrors the Android `ai/PromptBuilder.kt` and `ai/Providers.kt`. Supports three
+backends, chosen in the config flow:
+
+- "openai_compatible": any OpenAI-compatible chat endpoint (Ollama exposes one
+  at <host>:11434/v1). API key optional.
+- "homeassistant": use Home Assistant's configured LLM (get_ai_llm).
+- "none": no AI — sensors always carry the deterministic fallback sentence.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+import aiohttp
+
+from .const import (
+    LLM_HOME_ASSISTANT,
+    LLM_NONE,
+    LLM_OPENAI_COMPAT,
+)
+from .openmeteo import WeatherFacts, fallback_text
+
+_LOGGER = logging.getLogger(__name__)
+
+TIMEOUT = aiohttp.ClientTimeout(total=60)
+
+EXAMPLES_SHORT = [
+    "Rain starting in ~20 min, umbrella time.",
+    "Light rain easing, should stop in ~10 min.",
+    "Clear 26°, breezy; chance of drizzle after 6 pm.",
+    "Sunny and hot, 34°; storms possible late evening.",
+]
+
+EXAMPLES_TINY = [
+    "Rain in ~20 min.",
+    "Rain stops in ~10 min.",
+    "Clear 26°, breezy.",
+    "Hot 34°; storms late.",
+]
+
+
+def build_prompt(facts: WeatherFacts, tiny: bool) -> str:
+    """Assemble the same style of prompt the Android app uses."""
+    max_chars = 60 if tiny else 100
+    examples = EXAMPLES_TINY if tiny else EXAMPLES_SHORT
+
+    lines = [
+        "You write phone-widget weather sentences. Rules:",
+        f"- ONE sentence, max {max_chars} characters, no emoji, no greeting, no units (write \"28°\").",
+        "- Prioritise (in order): rain starting/stopping soon, extreme heat/cold, heavy wind/storm, otherwise keep it neutral.",
+        "- Only mention things that are actually true from the facts.",
+        "- Speak in present/next-hour terms.",
+        "Examples:",
+    ]
+    lines += [f'- "{e}"' for e in examples]
+    lines.append("")
+    lines.append("Facts:")
+    lines.append(
+        f"current: {facts.temp_c:.1f}°"
+        + (f" (feels {facts.feels_c:.1f}°)" if facts.feels_c is not None else "")
+        + (f", humidity {facts.humidity_pct}%" if facts.humidity_pct is not None else "")
+        + (f", wind {facts.wind_kmh:.0f} km/h" if facts.wind_kmh is not None else "")
+        + f", condition: {facts.condition_label.lower()}"
+    )
+    lines.append(f"raining_now: {str(facts.is_raining_now).lower()}")
+    lines.append(f"rain_start_in_min: {facts.rain_start_in_min if facts.rain_start_in_min is not None else 'none'}")
+    lines.append(f"rain_stop_in_min: {facts.rain_stop_in_min if facts.rain_stop_in_min is not None else 'none'}")
+    lines.append(f"precip_next_hour_mm: {facts.precip_next_hour_mm:.1f}")
+    if facts.max_chance_rain_24h:
+        lines.append(f"max_chance_rain_next_24h: {facts.max_chance_rain_24h[0]}% at {facts.max_chance_rain_24h[1]}")
+    if facts.peak_temp_24h:
+        lines.append(f"peak_temp_next_24h: {facts.peak_temp_24h[0]:.0f}° at {facts.peak_temp_24h[1]}")
+    lines.append("")
+    lines.append("Only output the sentence.")
+    return "\n".join(lines)
+
+
+async def generate_text(hass, config: dict[str, Any], prompt: str, tiny: bool) -> str | None:
+    """Generate a short sentence from a prompt using the configured backend."""
+    provider = config.get("llm_provider", LLM_NONE)
+    try:
+        if provider == LLM_OPENAI_COMPAT:
+            return await _openai_compatible(config, prompt)
+        if provider == LLM_HOME_ASSISTANT:
+            return await _home_assistant_llm(hass, prompt)
+    except Exception as err:  # noqa: BLE001 - never break the sensor
+        _LOGGER.warning("LLM generation failed: %s", err)
+    return None
+
+
+async def summarize(hass, config: dict[str, Any], facts: WeatherFacts, tiny: bool) -> str:
+    """Generate the sentence with fallback so sensors are never empty."""
+    prompt = build_prompt(facts, tiny)
+    text = await generate_text(hass, config, prompt, tiny)
+    if text:
+        cleaned = text.strip().strip("\"").strip().replace("\n", " ")
+        if cleaned:
+            return cleaned
+    return fallback_text(facts)
+
+
+async def _openai_compatible(config: dict[str, Any], prompt: str) -> str | None:
+    base = (config.get("llm_base_url") or "http://localhost:11434/v1").rstrip("/")
+    if not base.endswith("/v1"):
+        base += "/v1"
+    model = config.get("llm_model") or "llama3.2"
+    api_key = config.get("llm_api_key")
+
+    payload = {
+        "model": model,
+        "stream": False,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
+        async with session.post(f"{base}/chat/completions", json=payload, headers=headers) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+    choices = data.get("choices") or []
+    if not choices:
+        return None
+    content = (choices[0].get("message") or {}).get("content")
+    return content if isinstance(content, str) else None
+
+
+async def _home_assistant_llm(hass, prompt: str) -> str | None:
+    """Use Home Assistant's built-in LLM (Home Assistant 2025.2+)."""
+    from homeassistant.ai import get_ai_llm  # local import: newer HA only
+
+    llm = await get_ai_llm(hass, None)
+    response = await llm.async_generate(prompt)
+    content = getattr(response, "text", None) or getattr(response, "content", None)
+    return str(content) if content else None

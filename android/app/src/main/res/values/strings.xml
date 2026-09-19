@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Weather Summary</string>
+    <string name="widget_label">Weather Summary</string>
+    <string name="widget_label_full">Weather Summary — current + sentence</string>
+    <string name="widget_label_text">Weather Summary — sentence only</string>
+    <string name="widget_label_current">Weather Summary — current only</string>
+    <string name="widget_preview_summary">Rain easing — should stop in about an hour, then clearing up nicely.</string>
+    <string name="widget_preview_text_only">Rain easing — should stop in about an hour, then clearing up for the rest of the day.</string>
+
+    <string name="title_weather">Weather</string>
+    <string name="title_settings">Settings</string>
+    <string name="tab_now">Now</string>
+    <string name="tab_next_hours">Next hours</string>
+
+    <string name="summary_header">Brief</string>
+    <string name="summary_unavailable">No summary yet — open the app or wait for refresh.</string>
+    <string name="refresh">Refresh</string>
+    <string name="updated">Updated</string>
+    <string name="location_permission_needed">Location permission needed. Enable it (or set a location in Settings).</string>
+
+    <string name="settings_weather_provider">Weather provider</string>
+    <string name="settings_ai_provider">AI provider</string>
+    <string name="settings_gemini">Gemini (free tier)</string>
+    <string name="settings_ollama">Ollama</string>
+    <string name="settings_homeassistant">Home Assistant</string>
+    <string name="settings_api_key">API key</string>
+    <string name="settings_model">Model</string>
+    <string name="settings_base_url">Base URL</string>
+    <string name="settings_ha_url">Home Assistant URL</string>
+    <string name="settings_ha_token">Long-lived access token</string>
+    <string name="settings_length">Sentence length</string>
+    <string name="settings_length_short">Short (≤ 100 chars)</string>
+    <string name="settings_length_tiny">Tiny (≤ 60 chars)</string>
+    <string name="settings_manual_location">Use fixed location</string>
+    <string name="settings_latitude">Latitude</string>
+    <string name="settings_longitude">Longitude</string>
+    <string name="settings_use_gps">Use my location (GPS)</string>
+    <string name="settings_push_ha">Push latest data to Home Assistant</string>
+    <string name="settings_interval_min">Refresh interval (minutes)</string>
+    <string name="provider_openmeteo">Open-Meteo (no key)</string>
+    <string name="provider_openweathermap">OpenWeatherMap</string>
+    <string name="provider_weatherapi">WeatherAPI.com</string>
+    <string name="provider_wmo">WMO code %1$d</string>
+    <string name="back">Back</string>
+    <string name="settings_saved">Saved</string>
+</resources>

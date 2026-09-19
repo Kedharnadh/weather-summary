@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Weather Summary",
+        "description": "Choose where the forecast comes from and which free LLM writes the short sentence. Open-Meteo needs no key; OpenWeatherMap and WeatherAPI.com use their free keys. For the LLM, 'OpenAI-compatible' covers Ollama (<host>:11434/v1), 'Home Assistant' uses the LLM already configured in HA, 'None' uses a built-in template."
+      },
+      "options": {
+        "title": "Weather Summary options",
+        "description": "Adjust the weather provider, LLM backend, or refresh interval."
+      }
+    },
+    "error": {
+      "missing_key": "This weather provider needs an API key.",
+      "missing_url": "An LLM base URL is required for the OpenAI-compatible provider."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Weather Summary options",
+        "description": "Adjust the weather provider, LLM backend, or refresh interval."
+      }
+    },
+    "error": {
+      "missing_key": "This weather provider needs an API key.",
+      "missing_url": "An LLM base URL is required for the OpenAI-compatible provider."
+    }
+  }
+}
