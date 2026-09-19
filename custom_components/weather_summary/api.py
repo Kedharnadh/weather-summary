@@ -27,9 +27,7 @@ GENERATE_SCHEMA = vol.Schema(
 
 INGEST_SCHEMA = vol.Schema(
     {
-        vol.Required("payload"): vol.Mapping(
-            cv.string, vol.Any(cv.string, vol.Coerce(float), vol.Coerce(int), cv.boolean)
-        )
+        vol.Required("payload"): dict,
     }
 )
 
