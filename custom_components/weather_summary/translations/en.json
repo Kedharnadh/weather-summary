@@ -1,13 +1,4 @@
 {
-  "selector": {
-    "sentence_mode": {
-      "options": {
-        "tiny": "Tiny (≤ 60 chars)",
-        "short": "Short (≤ 100 chars)",
-        "long": "Long (≤ 240 chars)"
-      }
-    }
-  },
   "config": {
     "step": {
       "user": {

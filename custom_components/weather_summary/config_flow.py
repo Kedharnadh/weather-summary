@@ -51,16 +51,32 @@ LLM_PROVIDER_OPTIONS = [LLM_NONE, LLM_GEMINI, LLM_OPENAI_COMPAT, LLM_HOME_ASSIST
 SENTENCE_MODE_OPTIONS = [SENTENCE_TINY, SENTENCE_SHORT, SENTENCE_LONG]
 
 
+def _dropdown(options: list[str]) -> selector.SelectSelector:
+    """Dropdown selector that stays functional if mode enums get removed.
+
+    Newer HA refactors have been trimming helper APIs, so request the
+    dropdown nicety via getattr and fall back to the default (list) mode.
+    """
+    cfg_kwargs: dict[str, Any] = {"options": options}
+    mode = getattr(selector, "SelectSelectorMode", None)
+    if mode is not None:
+        try:
+            cfg_kwargs["mode"] = mode.DROPDOWN
+        except Exception:  # noqa: BLE001 - cosmetic only
+            pass
+    return selector.SelectSelector(selector.SelectSelectorConfig(**cfg_kwargs))
+
+
 def sentence_mode_select() -> selector.SelectSelector:
-    return selector.SelectSelector(
-        selector.SelectSelectorConfig(
-            options=[
-                "tiny", "short", "long",
-            ],
-            mode=selector.SelectSelectorMode.DROPDOWN,
-        ),
-        translation_key="sentence_mode",
-    )
+    return _dropdown(SENTENCE_MODE_OPTIONS)
+
+
+def weather_select() -> selector.SelectSelector:
+    return _dropdown(WEATHER_PROVIDER_OPTIONS)
+
+
+def llm_select() -> selector.SelectSelector:
+    return _dropdown(LLM_PROVIDER_OPTIONS)
 
 
 def _sentence_mode_default(config: dict[str, Any]) -> str:
@@ -68,24 +84,6 @@ def _sentence_mode_default(config: dict[str, Any]) -> str:
     if CONF_SENTENCE_MODE in config:
         return config[CONF_SENTENCE_MODE]
     return SENTENCE_TINY if config.get("tiny_sentence") else SENTENCE_SHORT
-
-
-def weather_select() -> selector.SelectSelector:
-    return selector.SelectSelector(
-        selector.SelectSelectorConfig(
-            options=WEATHER_PROVIDER_OPTIONS,
-            mode=selector.SelectSelectorMode.DROPDOWN,
-        )
-    )
-
-
-def llm_select() -> selector.SelectSelector:
-    return selector.SelectSelector(
-        selector.SelectSelectorConfig(
-            options=LLM_PROVIDER_OPTIONS,
-            mode=selector.SelectSelectorMode.DROPDOWN,
-        )
-    )
 
 
 class WeatherSummaryConfigFlow(ConfigFlow, domain=DOMAIN):
