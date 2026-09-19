@@ -94,7 +94,7 @@ Both work over the normal REST API; a Bearer token is required.
 
 | Service | Description |
 | --- | --- |
-| `weather_summary.generate` | Generate a sentence from a `prompt` (optional `tiny: true` for ≤ 60 chars). Returns `{"text": ...}`. |
+| `weather_summary.generate` | Generate a sentence from a `prompt` (optional `mode: tiny|short|long`; defaults to `short`). Returns `{"text": ...}`. |
 | `weather_summary.ingest_app` | Accepts a `payload` dict (temperature, summary, weather_code, is_raining, rain_start_in_min, …) pushed by the app and reflects it into the sensors. |
 
 ## Development

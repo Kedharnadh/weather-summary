@@ -19,7 +19,12 @@ CONF_LLM_API_KEY = "llm_api_key"
 CONF_LLM_GEMINI_KEY = "gemini_api_key"
 CONF_URL = "url"
 CONF_TOKEN = "token"  # reserved for future push-auth (app already uses its own token)
-CONF_TINY = "tiny_sentence"
+CONF_SENTENCE_MODE = "sentence_mode"
+
+# Sentence modes
+SENTENCE_TINY = "tiny"
+SENTENCE_SHORT = "short"
+SENTENCE_LONG = "long"
 
 # Weather providers
 PROVIDER_OPEN_METEO = "openmeteo"

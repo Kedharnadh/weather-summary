@@ -72,9 +72,16 @@ peak_temp_next_24h: 31° at 15:00
 Only output the sentence.
 ```
 
-### Length control (“tiny” vs “short”)
-- **Short** (default): ≤ 100 characters.
-- **Tiny** (widget): ≤ 60 characters. Same prompt, stricter rule.
+### Length control (“tiny” / “short” / “long”)
+Each mode just changes the character budget + rules, not the facts:
+- **Tiny** (widget): ≤ 60 characters, ONE sentence.
+- **Short** (default): ≤ 100 characters, ONE sentence.
+- **Long**: ≤ 240 characters, ONE or TWO sentences (more detail, e.g. the
+  afternoon after the rain). Same facts, looser rule.
+
+The mode travels as the string `tiny` / `short` / `long` and is stored in
+`Settings.sentenceMode` (app) / `sentence_mode` (HA config-entry options).
+Legacy boolean `tiny_sentence: true` maps to `tiny` on both sides.
 
 ### Fallback (no AI / AI failure)
 If the AI call fails, both sides generate a deterministic template sentence,

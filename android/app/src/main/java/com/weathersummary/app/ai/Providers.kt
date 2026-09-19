@@ -11,14 +11,14 @@ import com.weathersummary.app.prefs.Settings
 class GeminiAiProvider : AiProvider {
     override val id = AiProviders.GEMINI
 
-    override suspend fun summarize(facts: WeatherFacts, tiny: Boolean): String? {
+    override suspend fun summarize(facts: WeatherFacts, mode: String): String? {
         val key = Settings.geminiApiKey
         if (key.isBlank()) return null
         val model = Settings.geminiModel.ifBlank { "gemini-2.5-flash" }
 
         val body = JsonObject().apply {
             add("contents", JsonParser.parseString(
-                "[{\"parts\":[{\"text\":${JsonUtil.quote(PromptBuilder.build(facts, tiny))}}]}]"
+                "[{\"parts\":[{\"text\":${JsonUtil.quote(PromptBuilder.build(facts, mode))}}]}]"
             ))
             add("generationConfig", JsonParser.parseString(
                 "{\"temperature\":0.4,\"maxOutputTokens\":300}"
@@ -45,16 +45,18 @@ class GeminiAiProvider : AiProvider {
 class OllamaAiProvider : AiProvider {
     override val id = AiProviders.OLLAMA
 
-    override suspend fun summarize(facts: WeatherFacts, tiny: Boolean): String? {
+    override suspend fun summarize(facts: WeatherFacts, mode: String): String? {
         val base = Settings.ollamaUrl.trimEnd('/')
-        if (base.endsWith("/v1")) return openAiCompatible(base, eventsCompatible = false, facts = facts, tiny = tiny)
+        if (base.endsWith("/v1")) {
+            return openAiCompatible(base, eventsCompatible = false, facts = facts, mode = mode)
+        }
         val model = Settings.ollamaModel.ifBlank { "llama3.2" }
 
         val body = JsonObject().apply {
             addProperty("model", model)
             addProperty("stream", false)
             add("messages", JsonParser.parseString(
-                "[{\"role\":\"user\",\"content\":${JsonUtil.quote(PromptBuilder.build(facts, tiny))}}]"
+                "[{\"role\":\"user\",\"content\":${JsonUtil.quote(PromptBuilder.build(facts, mode))}}]"
             ))
         }
         val resp = Http.postJson("$base/api/chat", body.toString())
@@ -68,14 +70,14 @@ class OllamaAiProvider : AiProvider {
     }
 
     private suspend fun openAiCompatible(
-        base: String, eventsCompatible: Boolean, facts: WeatherFacts, tiny: Boolean,
+        base: String, eventsCompatible: Boolean, facts: WeatherFacts, mode: String,
     ): String? = runCatching {
         val model = Settings.ollamaModel.ifBlank { "llama3.2" }
         val body = JsonObject().apply {
             addProperty("model", model)
             addProperty("stream", false)
             add("messages", JsonParser.parseString(
-                "[{\"role\":\"user\",\"content\":${JsonUtil.quote(PromptBuilder.build(facts, tiny))}}]"
+                "[{\"role\":\"user\",\"content\":${JsonUtil.quote(PromptBuilder.build(facts, mode))}}]"
             ))
         }
         val resp = Http.postJson("$base/chat/completions", body.toString())
@@ -89,19 +91,19 @@ class OllamaAiProvider : AiProvider {
 /**
  * Home Assistant — configure your LLM once in HA (Ollama/OpenAI-compatible),
  * the app simply calls the integration's REST view:
- * POST /api/weather_summary/generate  {"prompt": "...", "tiny": true|false}
+ * POST /api/weather_summary/generate  {"prompt": "...", "mode": "tiny|short|long"}
  */
 class HomeAssistantAiProvider : AiProvider {
     override val id = AiProviders.HOME_ASSISTANT
 
-    override suspend fun summarize(facts: WeatherFacts, tiny: Boolean): String? {
+    override suspend fun summarize(facts: WeatherFacts, mode: String): String? {
         val url = Settings.haUrl.trimEnd('/') + "/api/weather_summary/generate"
         val token = Settings.haToken
         if (token.isBlank()) return null
 
         val body = JsonObject().apply {
-            addProperty("prompt", PromptBuilder.build(facts, tiny))
-            addProperty("tiny", tiny)
+            addProperty("prompt", PromptBuilder.build(facts, mode))
+            addProperty("mode", mode)
         }
         val resp = Http.postJson(url, body.toString(), bearerToken = token)
         return try {

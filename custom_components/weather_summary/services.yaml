@@ -10,12 +10,20 @@ generate:
       selector:
         text:
           multiline: true
-    tiny:
-      name: Tiny
-      description: "Restrict output to <=60 characters (best for phone widgets)."
-      default: false
+    mode:
+      name: Mode
+      description: "Sentence length: tiny (≤ 60 chars), short (≤ 100 chars), long (≤ 240 chars)."
+      default: short
       selector:
-        boolean:
+        select:
+          custom_value: false
+          options:
+            - label: Tiny (≤ 60 chars)
+              value: tiny
+            - label: Short (≤ 100 chars)
+              value: short
+            - label: Long (≤ 240 chars)
+              value: long
 
 ingest_app:
   name: Ingest app data

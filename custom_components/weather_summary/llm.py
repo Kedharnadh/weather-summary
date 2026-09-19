@@ -19,6 +19,7 @@ import aiohttp
 
 from .const import (
     CONF_LLM_GEMINI_KEY,
+    CONF_SENTENCE_MODE,
     GEMINI_URL,
     LLM_GEMINI,
     LLM_HOME_ASSISTANT,
@@ -45,15 +46,41 @@ EXAMPLES_TINY = [
     "Hot 34°; storms late.",
 ]
 
+EXAMPLES_LONG = [
+    "Rain starting in ~20 min, easing by early afternoon; after that it dries out and warms to 24°.",
+    "Clear and breezy at 26° all day; a light shower chance returns after 6 pm.",
+    "Sunny and hot, 34°; storms possible late evening, then cooler and calm tomorrow morning.",
+]
 
-def build_prompt(facts: WeatherFacts, tiny: bool) -> str:
+_MAX_BY_MODE = {"tiny": 60, "short": 100, "long": 240}
+_EXAMPLES_BY_MODE = {"tiny": EXAMPLES_TINY, "short": EXAMPLES_SHORT, "long": EXAMPLES_LONG}
+
+VALID_MODES = set(_MAX_BY_MODE)
+
+_MODE_LABEL = {"tiny": "Tiny (≤ 60 chars)", "short": "Short (≤ 100 chars)", "long": "Long (≤ 240 chars)"}
+
+
+def sentence_mode(config: dict[str, Any]) -> str:
+    """Current sentence mode, migrating the legacy tiny_sentence boolean."""
+    mode = config.get(CONF_SENTENCE_MODE)
+    if mode in VALID_MODES:
+        return mode
+    return "tiny" if config.get("tiny_sentence") else "short"
+
+
+def build_prompt(facts: WeatherFacts, mode: str) -> str:
     """Assemble the same style of prompt the Android app uses."""
-    max_chars = 60 if tiny else 100
-    examples = EXAMPLES_TINY if tiny else EXAMPLES_SHORT
+    max_chars = _MAX_BY_MODE.get(mode, 100)
+    examples = _EXAMPLES_BY_MODE.get(mode, EXAMPLES_SHORT)
+    sentence_rule = (
+        "Keep it to ONE or TWO short sentences, max 240 characters total"
+        if mode == "long"
+        else f"ONE sentence, max {max_chars} characters"
+    )
 
     lines = [
         "You write phone-widget weather sentences. Rules:",
-        f"- ONE sentence, max {max_chars} characters, no emoji, no greeting, no units (write \"28°\").",
+        f"- {sentence_rule}, no emoji, no greeting, no units (write \"28°\").",
         "- Prioritise (in order): rain starting/stopping soon, extreme heat/cold, heavy wind/storm, otherwise keep it neutral.",
         "- Only mention things that are actually true from the facts.",
         "- Speak in present/next-hour terms.",
@@ -82,7 +109,7 @@ def build_prompt(facts: WeatherFacts, tiny: bool) -> str:
     return "\n".join(lines)
 
 
-async def generate_text(hass, config: dict[str, Any], prompt: str, tiny: bool) -> str | None:
+async def generate_text(hass, config: dict[str, Any], prompt: str) -> str | None:
     """Generate a short sentence from a prompt using the configured backend."""
     provider = config.get("llm_provider", LLM_NONE)
     try:
@@ -97,10 +124,10 @@ async def generate_text(hass, config: dict[str, Any], prompt: str, tiny: bool) -
     return None
 
 
-async def summarize(hass, config: dict[str, Any], facts: WeatherFacts, tiny: bool) -> str:
+async def summarize(hass, config: dict[str, Any], facts: WeatherFacts, mode: str = "short") -> str:
     """Generate the sentence with fallback so sensors are never empty."""
-    prompt = build_prompt(facts, tiny)
-    text = await generate_text(hass, config, prompt, tiny)
+    prompt = build_prompt(facts, mode)
+    text = await generate_text(hass, config, prompt)
     if text:
         cleaned = text.strip().strip("\"").strip().replace("\n", " ")
         if cleaned:

@@ -59,7 +59,7 @@ fun SettingsScreen(onBack: () -> Unit, onSaved: () -> Unit) {
     var haUrl by rememberSaveable { mutableStateOf(Settings.haUrl) }
     var haToken by rememberSaveable { mutableStateOf(Settings.haToken) }
 
-    var tiny by rememberSaveable { mutableStateOf(Settings.tinySentence) }
+    var sentenceMode by rememberSaveable { mutableStateOf(Settings.sentenceMode) }
     var theme by rememberSaveable { mutableStateOf(Settings.themeMode) }
     var useGps by rememberSaveable { mutableStateOf(Settings.useGps) }
     var lat by rememberSaveable { mutableStateOf(Settings.latitude.toString()) }
@@ -179,8 +179,15 @@ fun SettingsScreen(onBack: () -> Unit, onSaved: () -> Unit) {
             }
 
             SectionHeader("Sentence")
-            OptionRow("Short (≤ 100 chars)", !tiny) { tiny = false }
-            OptionRow("Tiny (≤ 60 chars — best for the widget)", tiny) { tiny = true }
+            OptionRow(
+                "Long (≤ 240 chars)", sentenceMode == Settings.SENTENCE_LONG,
+            ) { sentenceMode = Settings.SENTENCE_LONG }
+            OptionRow(
+                "Short (≤ 100 chars)", sentenceMode == Settings.SENTENCE_SHORT,
+            ) { sentenceMode = Settings.SENTENCE_SHORT }
+            OptionRow(
+                "Tiny (≤ 60 chars — best for the widget)", sentenceMode == Settings.SENTENCE_TINY,
+            ) { sentenceMode = Settings.SENTENCE_TINY }
 
             SectionHeader("Location")
             SwitchRow("Use my location (GPS)", useGps, { useGps = it })
@@ -244,7 +251,7 @@ fun SettingsScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                     Settings.ollamaModel = ollamaModel.trim()
                     Settings.haUrl = haUrl.trim()
                     Settings.haToken = haToken.trim()
-                    Settings.tinySentence = tiny
+                    Settings.sentenceMode = sentenceMode
                     Settings.themeMode = theme
                     Settings.useGps = useGps
                     Settings.latitude = lat.toDoubleOrNull() ?: Settings.latitude

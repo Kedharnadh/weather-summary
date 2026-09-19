@@ -9,6 +9,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_SCAN_INTERVAL
 from homeassistant.helpers import selector
+from homeassistant.helpers.selector import SelectorValue
 import homeassistant.helpers.config_validation as cv
 
 from .const import (
@@ -18,7 +19,7 @@ from .const import (
     CONF_LLM_MODEL,
     CONF_LLM_PROVIDER,
     CONF_OWM_API_KEY,
-    CONF_TINY,
+    CONF_SENTENCE_MODE,
     CONF_WEATHER_PROVIDER,
     CONF_WA_API_KEY,
     CONF_WINDY_API_KEY,
@@ -32,6 +33,9 @@ from .const import (
     PROVIDER_OPEN_WEATHER_MAP,
     PROVIDER_WEATHER_API_COM,
     PROVIDER_WINDY,
+    SENTENCE_LONG,
+    SENTENCE_SHORT,
+    SENTENCE_TINY,
 )
 
 WEATHER_PROVIDER_OPTIONS = [
@@ -42,6 +46,28 @@ WEATHER_PROVIDER_OPTIONS = [
 ]
 
 LLM_PROVIDER_OPTIONS = [LLM_NONE, LLM_GEMINI, LLM_OPENAI_COMPAT, LLM_HOME_ASSISTANT]
+
+SENTENCE_MODE_OPTIONS = [SENTENCE_TINY, SENTENCE_SHORT, SENTENCE_LONG]
+
+
+def sentence_mode_select() -> selector.SelectSelector:
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[
+                SelectorValue(value=SENTENCE_TINY, label="Tiny (≤ 60 chars)"),
+                SelectorValue(value=SENTENCE_SHORT, label="Short (≤ 100 chars)"),
+                SelectorValue(value=SENTENCE_LONG, label="Long (≤ 240 chars)"),
+            ],
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
+    )
+
+
+def _sentence_mode_default(config: dict[str, Any]) -> str:
+    """Current sentence mode, migrating the legacy tiny_sentence boolean."""
+    if CONF_SENTENCE_MODE in config:
+        return config[CONF_SENTENCE_MODE]
+    return SENTENCE_TINY if config.get("tiny_sentence") else SENTENCE_SHORT
 
 
 def weather_select() -> selector.SelectSelector:
@@ -106,7 +132,7 @@ class WeatherSummaryConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_LLM_MODEL: user_input.get(CONF_LLM_MODEL) or "llama3.2",
                         CONF_LLM_API_KEY: user_input.get(CONF_LLM_API_KEY) or "",
                         CONF_SCAN_INTERVAL: user_input.get(CONF_SCAN_INTERVAL) or DEFAULT_SCAN_INTERVAL,
-                        CONF_TINY: user_input.get(CONF_TINY, False),
+                        CONF_SENTENCE_MODE: user_input.get(CONF_SENTENCE_MODE) or SENTENCE_SHORT,
                     },
                 )
 
@@ -129,10 +155,10 @@ class WeatherSummaryConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_LLM_BASE_URL, default="http://localhost:11434/v1"): cv.string,
                 vol.Optional(CONF_LLM_MODEL, default="llama3.2"): cv.string,
                 vol.Optional(CONF_LLM_API_KEY): cv.string,
+                vol.Required(CONF_SENTENCE_MODE, default=SENTENCE_SHORT): sentence_mode_select(),
                 vol.Required(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(
                     vol.Coerce(int), vol.Range(min=5, max=360)
                 ),
-                vol.Optional(CONF_TINY, default=False): cv.boolean,
             }
         )
 
@@ -186,11 +212,11 @@ class WeatherSummaryOptionsFlow(OptionsFlow):
                 ): cv.string,
                 vol.Optional(CONF_LLM_MODEL, default=current.get(CONF_LLM_MODEL, "llama3.2")): cv.string,
                 vol.Optional(CONF_LLM_API_KEY, default=current.get(CONF_LLM_API_KEY, "")): cv.string,
+                vol.Optional(CONF_SENTENCE_MODE, default=_sentence_mode_default(current)): sentence_mode_select(),
                 vol.Required(
                     CONF_SCAN_INTERVAL,
                     default=current.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
                 ): vol.All(vol.Coerce(int), vol.Range(min=5, max=360)),
-                vol.Optional(CONF_TINY, default=current.get(CONF_TINY, False)): cv.boolean,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema, errors=errors)

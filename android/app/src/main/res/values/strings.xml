@@ -30,6 +30,7 @@
     <string name="settings_ha_url">Home Assistant URL</string>
     <string name="settings_ha_token">Long-lived access token</string>
     <string name="settings_length">Sentence length</string>
+    <string name="settings_length_long">Long (up to 240 chars)</string>
     <string name="settings_length_short">Short (≤ 100 chars)</string>
     <string name="settings_length_tiny">Tiny (≤ 60 chars)</string>
     <string name="settings_manual_location">Use fixed location</string>

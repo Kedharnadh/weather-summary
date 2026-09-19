@@ -1,6 +1,6 @@
 """HTTP view + services that let the Android app talk to this integration.
 
-- POST /api/weather_summary/generate  {"prompt": "...", "tiny": false|true}
+- POST /api/weather_summary/generate  {"prompt": "...", "mode": "tiny|short|long"}
   → {"text": "..."}      (used by the app when AI provider = Home Assistant)
 - service weather_summary.generate  (same, with prompt field)
 - service weather_summary.ingest_app (payload dict) → updates the sensors with
@@ -16,12 +16,13 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
 
 from . import llm
-from .const import DOMAIN
+from .const import CONF_SENTENCE_MODE, DOMAIN
 
 GENERATE_SCHEMA = vol.Schema(
     {
         vol.Required("prompt"): cv.string,
-        vol.Optional("tiny", default=False): cv.boolean,
+        vol.Optional("mode", default="short"): vol.In(["tiny", "short", "long"]),
+        vol.Optional("tiny", default=False): cv.boolean,  # legacy
     }
 )
 
@@ -45,11 +46,11 @@ class WeatherSummaryGenerateView(HomeAssistantView):
     async def post(self, request):
         data = await request.json()
         prompt = str(data.get("prompt", "")).strip()
-        tiny = bool(data.get("tiny", False))
         if not prompt:
             return self.json({"error": "prompt is required"}, status_code=400)
+        mode = str(data.get("mode") or ("tiny" if data.get("tiny") else "short"))
         text = await llm.generate_text(
-            self._coordinator.hass, self._coordinator.config, prompt, tiny
+            self._coordinator.hass, self._coordinator.config, prompt
         )
         if text is None:
             return self.json(
@@ -69,9 +70,9 @@ async def async_register_http(hass: HomeAssistant, coordinator) -> None:
 async def async_register_services(hass: HomeAssistant, coordinator) -> None:
     async def handle_generate(call: ServiceCall):
         prompt = str(call.data["prompt"]).strip()
-        tiny = bool(call.data.get("tiny", False))
-        coordinator.config["tiny_sentence"] = tiny  # keep HA + app prompts in sync
-        text = await llm.generate_text(hass, coordinator.config, prompt, tiny)
+        mode = str(call.data.get("mode") or ("tiny" if call.data.get("tiny") else "short"))
+        coordinator.config[CONF_SENTENCE_MODE] = mode  # keep HA + app prompts in sync
+        text = await llm.generate_text(hass, coordinator.config, prompt)
         if text:
             coordinator.summary = text
             if coordinator.data:
@@ -80,7 +81,7 @@ async def async_register_services(hass: HomeAssistant, coordinator) -> None:
                 )
             return {"text": text}
         if coordinator.facts:
-            text = await llm.summarize(hass, coordinator.config, coordinator.facts, tiny)
+            text = await llm.summarize(hass, coordinator.config, coordinator.facts, mode)
             coordinator.summary = text
             if coordinator.data:
                 coordinator.async_set_updated_data(

@@ -23,7 +23,7 @@ object WeatherRepository {
         val provider = WeatherProviders.from(Settings)
         val snapshot = provider.fetch(lat, lon)
         val facts = ForecastFacts.derive(snapshot)
-        val summary = Summary.generate(snapshot, Settings.tinySentence)
+        val summary = Summary.generate(snapshot, Settings.sentenceMode)
         return RefreshResult(snapshot, facts, summary)
     }
 

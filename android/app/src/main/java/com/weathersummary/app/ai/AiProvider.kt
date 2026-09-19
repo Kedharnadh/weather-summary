@@ -11,7 +11,7 @@ import com.weathersummary.app.prefs.Settings
 interface AiProvider {
     val id: String
     /** Returns the sentence, or null if it must be retried / cannot be produced. */
-    suspend fun summarize(facts: WeatherFacts, tiny: Boolean): String?
+    suspend fun summarize(facts: WeatherFacts, mode: String): String?
 }
 
 object AiProviders {
@@ -43,13 +43,27 @@ object PromptBuilder {
         "Hot 34°; storms late.",
     )
 
-    fun build(facts: WeatherFacts, tiny: Boolean): String {
-        val max = if (tiny) 60 else 100
-        val examples = if (tiny) exampleTiny else exampleShort
+    val exampleLong = listOf(
+        "Rain starting in ~20 min, easing by early afternoon; after that it dries out and warms to 24°.",
+        "Clear and breezy at 26° all day; a light shower chance returns after 6 pm.",
+        "Sunny and hot, 34°; storms possible late evening, then cooler and calm tomorrow morning.",
+    )
+
+    fun build(facts: WeatherFacts, mode: String): String {
+        val (max, examples) = when (mode) {
+            "long" -> 240 to exampleLong
+            "tiny" -> 60 to exampleTiny
+            else -> 100 to exampleShort
+        }
+        val sentenceRule = if (mode == "long") {
+            "Keep it to ONE or TWO short sentences, max $max characters total"
+        } else {
+            "ONE sentence, max $max characters"
+        }
 
         val line = StringBuilder()
         line.append("You write phone-widget weather sentences. Rules:\n")
-        line.append("- ONE sentence, max $max characters, no emoji, no greeting, no units (write \"28°\").\n")
+        line.append("- $sentenceRule, no emoji, no greeting, no units (write \"28°\").\n")
         line.append("- Prioritise (in order): rain starting/stopping soon, extreme heat/cold, heavy wind/storm, otherwise keep it neutral.\n")
         line.append("- Only mention things that are actually true from the facts.\n")
         line.append("- Speak in present/next-hour terms.\n")
@@ -83,12 +97,12 @@ object Summary {
      * [Settings.lastAiError] is set when the AI request failed so the UI can
      * surface why no AI sentence was produced.
      */
-    suspend fun generate(snapshot: WeatherSnapshot, tiny: Boolean): String {
+    suspend fun generate(snapshot: WeatherSnapshot, mode: String): String {
         val facts = ForecastFacts.derive(snapshot)
         val id = Settings.aiProvider
         val ai = AiProviders.from(id)
         return try {
-            val text = ai.summarize(facts, tiny)?.clean()?.takeIf { it.isNotEmpty() }
+            val text = ai.summarize(facts, mode)?.clean()?.takeIf { it.isNotEmpty() }
             if (text != null) {
                 Settings.lastAiError = ""
                 text

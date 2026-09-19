@@ -25,6 +25,7 @@ object Settings {
     private const val K_HA_URL = "ha_url"
     private const val K_HA_TOKEN = "ha_token"
     private const val K_TINY = "tiny_sentence"
+    private const val K_SENTENCE_MODE = "sentence_mode"
     private const val K_USE_GPS = "use_gps"
     private const val K_LAT = "lat"
     private const val K_LON = "lon"
@@ -51,6 +52,11 @@ object Settings {
     const val AI_GEMINI = "gemini"
     const val AI_OLLAMA = "ollama"
     const val AI_HOME_ASSISTANT = "homeassistant"
+
+    // sentence modes — keep in sync with docs/RECIPE.md
+    const val SENTENCE_TINY = "tiny"
+    const val SENTENCE_SHORT = "short"
+    const val SENTENCE_LONG = "long"
 
     fun init(context: Context) {
         sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -97,9 +103,10 @@ object Settings {
         get() = sp.getString(K_HA_TOKEN, "") ?: ""
         set(v) = edit { putString(K_HA_TOKEN, v) }
 
-    var tinySentence: Boolean
-        get() = sp.getBoolean(K_TINY, false)
-        set(v) = edit { putBoolean(K_TINY, v) }
+    var sentenceMode: String
+        get() = sp.getString(K_SENTENCE_MODE, null)
+            ?: if (sp.getBoolean(K_TINY, false)) SENTENCE_TINY else SENTENCE_SHORT
+        set(v) = edit { putString(K_SENTENCE_MODE, v) }
     var useGps: Boolean
         get() = sp.getBoolean(K_USE_GPS, true)
         set(v) = edit { putBoolean(K_USE_GPS, v) }
