@@ -136,7 +136,7 @@ into the existing provider with no code changes.
 
 | Backend | Free limit | ~Usage here |
 | --- | --- | --- |
-| Gemini (free tier, `gemini-2.5-flash`/`3-flash`) | ~10 req/min, ~1,500 req/day (per project, resets midnight PT). Since mid-2026 keys should be restricted to the Gemini API in AI Studio. | 15-min refresh ≈ 96/day; even 5-min refresh ≈ 288/day. |
+| Gemini (free tier, `gemini-3.8-flash` + others) | ~10 req/min, ~1,500 req/day (per project, resets midnight PT). Since mid-2026 keys should be restricted to the Gemini API in AI Studio. | 15-min refresh ≈ 96/day; even 5-min refresh ≈ 288/day. |
 | Ollama | Unbounded (local). | — |
 | Home Assistant LLM | Whatever backend it points to (Ollama = unbounded; a cloud one has that vendor's limits). | — |
 

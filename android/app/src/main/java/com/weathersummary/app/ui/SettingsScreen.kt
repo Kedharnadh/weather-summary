@@ -139,7 +139,7 @@ fun SettingsScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                     OutlinedTextField(
                         value = geminiModel,
                         onValueChange = { geminiModel = it },
-                        label = { Text("Model (default gemini-2.5-flash)") },
+                        label = { Text("Model (default gemini-3.8-flash)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )

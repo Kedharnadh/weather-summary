@@ -88,7 +88,7 @@ object Settings {
         get() = sp.getString(K_GEMINI_KEY, "") ?: ""
         set(v) = edit { putString(K_GEMINI_KEY, v) }
     var geminiModel: String
-        get() = sp.getString(K_GEMINI_MODEL, "gemini-2.5-flash") ?: "gemini-2.5-flash"
+        get() = sp.getString(K_GEMINI_MODEL, "gemini-3.8-flash") ?: "gemini-3.8-flash"
         set(v) = edit { putString(K_GEMINI_MODEL, v) }
     var ollamaUrl: String
         get() = sp.getString(K_OLLAMA_URL, "http://192.168.1.1:11434") ?: "http://192.168.1.1:11434"

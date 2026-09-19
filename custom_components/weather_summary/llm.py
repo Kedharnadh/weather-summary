@@ -19,7 +19,9 @@ import aiohttp
 
 from .const import (
     CONF_LLM_GEMINI_KEY,
+    CONF_LLM_GEMINI_MODEL,
     CONF_SENTENCE_MODE,
+    DEFAULT_GEMINI_MODEL,
     GEMINI_URL,
     LLM_GEMINI,
     LLM_HOME_ASSISTANT,
@@ -176,7 +178,11 @@ async def _gemini(config: dict[str, Any], prompt: str) -> str | None:
     if not api_key:
         _LOGGER.warning("Gemini provider selected but no API key configured")
         return None
-    model = config.get("llm_model") or "gemini-2.5-flash"
+    model = (
+        config.get(CONF_LLM_GEMINI_MODEL)
+        or config.get("llm_model")
+        or DEFAULT_GEMINI_MODEL
+    )
     url = f"{GEMINI_URL}/models/{model}:generateContent?key={api_key}"
     payload = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],

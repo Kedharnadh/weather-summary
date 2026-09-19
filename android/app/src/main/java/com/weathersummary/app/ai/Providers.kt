@@ -14,7 +14,7 @@ class GeminiAiProvider : AiProvider {
     override suspend fun summarize(facts: WeatherFacts, mode: String): String? {
         val key = Settings.geminiApiKey
         if (key.isBlank()) return null
-        val model = Settings.geminiModel.ifBlank { "gemini-2.5-flash" }
+        val model = Settings.geminiModel.ifBlank { "gemini-3.8-flash" }
 
         val body = JsonObject().apply {
             add("contents", JsonParser.parseString(

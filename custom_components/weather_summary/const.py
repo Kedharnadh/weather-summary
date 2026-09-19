@@ -17,6 +17,7 @@ CONF_LLM_BASE_URL = "llm_base_url"
 CONF_LLM_MODEL = "llm_model"
 CONF_LLM_API_KEY = "llm_api_key"
 CONF_LLM_GEMINI_KEY = "gemini_api_key"
+CONF_LLM_GEMINI_MODEL = "gemini_model"
 CONF_URL = "url"
 CONF_TOKEN = "token"  # reserved for future push-auth (app already uses its own token)
 CONF_SENTENCE_MODE = "sentence_mode"
@@ -41,6 +42,7 @@ LLM_GEMINI = "gemini"
 # Defaults
 DEFAULT_SCAN_INTERVAL = 15
 MIN_SCAN_INTERVAL = 5
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 OPEN_WEATHER_MAP_URL = "https://api.openweathermap.org/data/3.0/onecall"
