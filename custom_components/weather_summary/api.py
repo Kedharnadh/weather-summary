@@ -16,7 +16,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
 
 from . import llm
-from .const import CONF_SENTENCE_MODE, DOMAIN
+from .const import DOMAIN
 
 GENERATE_SCHEMA = vol.Schema(
     {
@@ -44,11 +44,19 @@ class WeatherSummaryGenerateView(HomeAssistantView):
         self._coordinator = coordinator
 
     async def post(self, request):
-        data = await request.json()
+        try:
+            data = await request.json()
+        except Exception:  # noqa: BLE001 - malformed body must not 500
+            return self.json({"error": "invalid JSON body"}, status_code=400)
         prompt = str(data.get("prompt", "")).strip()
         if not prompt:
             return self.json({"error": "prompt is required"}, status_code=400)
         mode = str(data.get("mode") or ("tiny" if data.get("tiny") else "short"))
+        if mode not in llm.VALID_MODES:
+            return self.json(
+                {"error": f"mode must be one of {sorted(llm.VALID_MODES)}"},
+                status_code=400,
+            )
         text = await llm.generate_text(
             self._coordinator.hass, self._coordinator.config, prompt
         )
@@ -63,21 +71,28 @@ class WeatherSummaryGenerateView(HomeAssistantView):
         return await self.post(request)
 
 
-async def async_register_http(hass: HomeAssistant, coordinator) -> None:
-    hass.http.register_view(WeatherSummaryGenerateView(coordinator))
+async def async_register_http(
+    hass: HomeAssistant, coordinator
+) -> WeatherSummaryGenerateView:
+    view = WeatherSummaryGenerateView(coordinator)
+    hass.http.register_view(view)
+    return view
+
+
+async def async_unregister_http(hass: HomeAssistant, view) -> None:
+    hass.http.unregister_view(view)
 
 
 async def async_register_services(hass: HomeAssistant, coordinator) -> None:
     async def handle_generate(call: ServiceCall):
         prompt = str(call.data["prompt"]).strip()
         mode = str(call.data.get("mode") or ("tiny" if call.data.get("tiny") else "short"))
-        coordinator.config[CONF_SENTENCE_MODE] = mode  # keep HA + app prompts in sync
         text = await llm.generate_text(hass, coordinator.config, prompt)
         if text:
             coordinator.summary = text
             if coordinator.data:
                 coordinator.async_set_updated_data(
-                    {**coordinator.data, "summary": text}
+                    {**coordinator.data, "text": text}
                 )
             return {"text": text}
         if coordinator.facts:
@@ -85,7 +100,7 @@ async def async_register_services(hass: HomeAssistant, coordinator) -> None:
             coordinator.summary = text
             if coordinator.data:
                 coordinator.async_set_updated_data(
-                    {**coordinator.data, "summary": text}
+                    {**coordinator.data, "text": text}
                 )
             return {"text": text}
         return {"text": None}

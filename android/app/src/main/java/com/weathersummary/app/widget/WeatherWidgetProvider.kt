@@ -28,7 +28,7 @@ class WeatherWidgetProvider : WeatherWidgetBase() {
         views.setTextViewText(R.id.widget_temp, WeatherWidgetBase.tempText())
         views.setTextViewText(
             R.id.widget_condition,
-            Settings.cachedCondition.ifBlank { "Fetching\u2026" }
+            Settings.cachedCondition.ifBlank { "Fetching\u2026" } + WeatherWidgetBase.staleSuffix()
         )
         views.setTextViewText(
             R.id.widget_summary,

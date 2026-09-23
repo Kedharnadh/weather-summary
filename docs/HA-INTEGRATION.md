@@ -14,6 +14,7 @@ configure.
 
 | Entity | Details |
 | --- | --- |
+| `weather.weather_summary` | Standard weather entity with current conditions + hourly forecast. |
 | `sensor.weather_summary_text` | The AI sentence (short, widget-ready). |
 | `sensor.weather_summary_temperature` | Current temperature (°C). |
 | `sensor.weather_summary_apparent_temperature` | Feels-like (°C). |
@@ -26,6 +27,9 @@ configure.
 | `sensor.weather_summary_rain_chance_next_24_h` | % (diagnostic). |
 | `sensor.weather_summary_peak_temperature_next_24_h` | °C (diagnostic). |
 | `sensor.weather_summary_updated` | Timestamp of last refresh. |
+
+> Requires **Home Assistant 2025.2 or newer** (the `homeassistant` LLM
+> provider uses `homeassistant.ai.get_ai_llm`, which shipped in 2025.2).
 
 ## Installation
 
@@ -73,6 +77,9 @@ then restart Home Assistant.
      model `llama3.2`; keys optional) · `homeassistant` (uses the LLM configured
      in HA) · `none` (built-in template, no AI);
    - **Scan interval** in minutes.
+
+Lat/lon, provider, LLM backend and scan interval stay editable afterwards via
+**Settings → Devices & Services → Weather Summary → Options**.
 
 There is no YAML setup — this integration is config-flow only.
 

@@ -1,5 +1,6 @@
 package com.weathersummary.app.ai
 
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.weathersummary.app.data.Http
@@ -17,18 +18,23 @@ class GeminiAiProvider : AiProvider {
         val model = Settings.geminiModel.ifBlank { "gemini-3.8-flash" }
 
         val body = JsonObject().apply {
-            add("contents", JsonParser.parseString(
-                "[{\"parts\":[{\"text\":${JsonUtil.quote(PromptBuilder.build(facts, mode))}}]}]"
-            ))
-            add("generationConfig", JsonParser.parseString(
-                "{\"temperature\":0.4,\"maxOutputTokens\":300}"
-            ))
+            val parts = JsonArray().apply {
+                add(JsonObject().apply { addProperty("text", PromptBuilder.build(facts, mode)) })
+            }
+            val contents = JsonArray().apply {
+                add(JsonObject().apply { add("parts", parts) })
+            }
+            add("contents", contents)
+            add("generationConfig", JsonObject().apply {
+                addProperty("temperature", 0.4)
+                addProperty("maxOutputTokens", 300)
+            })
         }
 
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$key"
         val resp = Http.postJson(url, body.toString(), bearerToken = null)
         return try {
-            val root = gson().fromJson(resp, JsonObject::class.java)
+            val root = gson.fromJson(resp, JsonObject::class.java)
             val candidates = root.getAsJsonArray("candidates")
             if (candidates.size() == 0) return null
             val parts = candidates[0].asJsonObject
@@ -48,16 +54,14 @@ class OllamaAiProvider : AiProvider {
     override suspend fun summarize(facts: WeatherFacts, mode: String): String? {
         val base = Settings.ollamaUrl.trimEnd('/')
         if (base.endsWith("/v1")) {
-            return openAiCompatible(base, eventsCompatible = false, facts = facts, mode = mode)
+            return openAiCompatible(base, facts = facts, mode = mode)
         }
         val model = Settings.ollamaModel.ifBlank { "llama3.2" }
 
         val body = JsonObject().apply {
             addProperty("model", model)
             addProperty("stream", false)
-            add("messages", JsonParser.parseString(
-                "[{\"role\":\"user\",\"content\":${JsonUtil.quote(PromptBuilder.build(facts, mode))}}]"
-            ))
+            add("messages", chatMessages(facts, mode))
         }
         val resp = Http.postJson("$base/api/chat", body.toString())
         return try {
@@ -70,15 +74,13 @@ class OllamaAiProvider : AiProvider {
     }
 
     private suspend fun openAiCompatible(
-        base: String, eventsCompatible: Boolean, facts: WeatherFacts, mode: String,
+        base: String, facts: WeatherFacts, mode: String,
     ): String? = runCatching {
         val model = Settings.ollamaModel.ifBlank { "llama3.2" }
         val body = JsonObject().apply {
             addProperty("model", model)
             addProperty("stream", false)
-            add("messages", JsonParser.parseString(
-                "[{\"role\":\"user\",\"content\":${JsonUtil.quote(PromptBuilder.build(facts, mode))}}]"
-            ))
+            add("messages", chatMessages(facts, mode))
         }
         val resp = Http.postJson("$base/chat/completions", body.toString())
         JsonParser.parseString(resp).asJsonObject
@@ -86,6 +88,14 @@ class OllamaAiProvider : AiProvider {
             .getAsJsonObject("message")
             .get("content")?.asString
     }.getOrNull()
+
+    private fun chatMessages(facts: WeatherFacts, mode: String): JsonArray =
+        JsonArray().apply {
+            add(JsonObject().apply {
+                addProperty("role", "user")
+                addProperty("content", PromptBuilder.build(facts, mode))
+            })
+        }
 }
 
 /**
@@ -111,24 +121,5 @@ class HomeAssistantAiProvider : AiProvider {
         } catch (e: Exception) {
             null
         }
-    }
-}
-
-object JsonUtil {
-    fun quote(s: String): String {
-        val sb = StringBuilder(s.length + 16)
-        sb.append('"')
-        for (c in s) {
-            when (c) {
-                '"' -> sb.append("\\\"")
-                '\\' -> sb.append("\\\\")
-                '\n' -> sb.append("\\n")
-                '\r' -> sb.append("\\r")
-                '\t' -> sb.append("\\t")
-                else -> if (c <= '\u001f') sb.append("\\u%04x".format(c.code)) else sb.append(c)
-            }
-        }
-        sb.append('"')
-        return sb.toString()
     }
 }

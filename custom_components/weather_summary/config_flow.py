@@ -6,9 +6,10 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_SCAN_INTERVAL
-from homeassistant.helpers import selector
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry, selector
 import homeassistant.helpers.config_validation as cv
 
 from .const import (
@@ -50,6 +51,20 @@ LLM_PROVIDER_OPTIONS = [LLM_NONE, LLM_GEMINI, LLM_OPENAI_COMPAT, LLM_HOME_ASSIST
 
 SENTENCE_MODE_OPTIONS = [SENTENCE_TINY, SENTENCE_SHORT, SENTENCE_LONG]
 
+# Sensor unique_ids changed when the entity names were aligned with the
+# documented sensor slugs (v1 -> v2). Map old keys onto the new ones so
+# existing registry entries (custom names, disabled/hidden flags) survive.
+_UNIQUE_ID_RENAMES = {
+    "summary": "text",
+    "wind_kmh": "wind",
+    "rain_start_in_min": "rain_starts_in",
+    "rain_stop_in_min": "rain_stops_in",
+    "precip_next_hour_mm": "precipitation_next_hour",
+    "rain_chance_24h_pct": "rain_chance_next_24_h",
+    "peak_temp_24h": "peak_temperature_next_24_h",
+    "updated_at": "updated",
+}
+
 
 def _dropdown(options: list[str]) -> selector.SelectSelector:
     """Dropdown selector that stays functional if mode enums get removed.
@@ -86,11 +101,23 @@ def _sentence_mode_default(config: dict[str, Any]) -> str:
     return SENTENCE_TINY if config.get("tiny_sentence") else SENTENCE_SHORT
 
 
+def _ha_supports_ai_llm() -> bool:
+    """True when this HA core exposes homeassistant.ai.get_ai_llm (2025.2+)."""
+    try:
+        from homeassistant.ai import get_ai_llm  # noqa: F401
+
+        return True
+    except Exception:  # noqa: BLE001 - import fails on older HA
+        return False
+
+
 class WeatherSummaryConfigFlow(ConfigFlow, domain=DOMAIN):
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
+        if self._async_current_entries():
+            return self.async_abort(reason="single_instance_allowed")
         if user_input is not None:
             if user_input[CONF_WEATHER_PROVIDER] == PROVIDER_OPEN_WEATHER_MAP and not user_input.get(
                 CONF_OWM_API_KEY
@@ -112,6 +139,8 @@ class WeatherSummaryConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_LLM_BASE_URL
             ):
                 errors[CONF_LLM_BASE_URL] = "missing_url"
+            if user_input[CONF_LLM_PROVIDER] == LLM_HOME_ASSISTANT and not _ha_supports_ai_llm():
+                errors[CONF_LLM_PROVIDER] = "ha_llm_requires_newer_ha"
             if not errors:
                 return self.async_create_entry(
                     title="Weather Summary",
@@ -137,6 +166,24 @@ class WeatherSummaryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         schema = self._build_user_schema()
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+    @staticmethod
+    async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+        """Migrate v1 -> v2: remap sensor unique_ids to the documented slugs."""
+        if config_entry.version > 2:
+            return False
+        if config_entry.version == 1:
+            entries = entity_registry.async_get(hass)
+            for old_key, new_key in _UNIQUE_ID_RENAMES.items():
+                entity_id = entries.async_get_entity_id(
+                    "sensor", DOMAIN, f"{config_entry.entry_id}_{old_key}"
+                )
+                if entity_id:
+                    entries.async_update_entity(
+                        entity_id, new_unique_id=f"{config_entry.entry_id}_{new_key}"
+                    )
+            config_entry.version = 2
+        return True
 
     def _build_user_schema(self) -> vol.Schema:
         lat = self.hass.config.latitude or 0.0
@@ -194,12 +241,18 @@ class WeatherSummaryOptionsFlow(OptionsFlow):
                 CONF_LLM_BASE_URL
             ):
                 errors[CONF_LLM_BASE_URL] = "missing_url"
+            if user_input[CONF_LLM_PROVIDER] == LLM_HOME_ASSISTANT and not _ha_supports_ai_llm():
+                errors[CONF_LLM_PROVIDER] = "ha_llm_requires_newer_ha"
             if not errors:
                 return self.async_create_entry(title="Weather Summary", data=user_input)
 
         current = self._entry.options
+        lat = current.get(CONF_LATITUDE, self._entry.data.get(CONF_LATITUDE, self.hass.config.latitude or 0.0))
+        lon = current.get(CONF_LONGITUDE, self._entry.data.get(CONF_LONGITUDE, self.hass.config.longitude or 0.0))
         schema = vol.Schema(
             {
+                vol.Required(CONF_LATITUDE, default=lat): cv.latitude,
+                vol.Required(CONF_LONGITUDE, default=lon): cv.longitude,
                 vol.Required(CONF_WEATHER_PROVIDER, default=current.get(CONF_WEATHER_PROVIDER, PROVIDER_OPEN_METEO)): weather_select(),
                 vol.Optional(CONF_OWM_API_KEY, default=current.get(CONF_OWM_API_KEY, "")): cv.string,
                 vol.Optional(CONF_WA_API_KEY, default=current.get(CONF_WA_API_KEY, "")): cv.string,

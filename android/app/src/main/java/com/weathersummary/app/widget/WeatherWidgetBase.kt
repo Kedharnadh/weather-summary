@@ -147,5 +147,20 @@ abstract class WeatherWidgetBase : AppWidgetProvider() {
             val temp = Settings.cachedTempC
             return if (temp.isFinite()) "${Math.round(temp)}°" else "--°"
         }
+
+        /**
+         * " · upd 3h" when the cache is older than 2× the refresh interval —
+         * tells the user the widget data is stale instead of silently lying.
+         * Returns "" when fresh (or never refreshed).
+         */
+        fun staleSuffix(): String {
+            val updated = Settings.cachedUpdatedAtMs
+            if (updated <= 0) return ""
+            val ageMs = System.currentTimeMillis() - updated
+            val staleAfterMs = Settings.intervalMinutes.coerceAtLeast(15L) * 60_000L * 2
+            if (ageMs < staleAfterMs) return ""
+            val mins = ageMs / 60_000L
+            return if (mins < 60) " · upd ${mins}m" else " · upd ${mins / 60}h"
+        }
     }
 }

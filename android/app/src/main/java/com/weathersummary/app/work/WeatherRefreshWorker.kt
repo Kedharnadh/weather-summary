@@ -65,8 +65,14 @@ class WeatherRefreshWorker(context: Context, params: WorkerParameters) :
          * Runs the <i>whole</i> pipeline inline so callers (the alarm receiver)
          * don't have to bounce back through WorkManager, which aggressive
          * OEMs (OnePlus/OxygenOS) defer indefinitely.
+         *
+         * Skips when a refresh already happened within [MIN_REFRESH_GAP_MS] so
+         * the WorkManager periodic job and the AlarmManager tick don't both fire
+         * the same network + AI round-trip. Manual/UI refreshes bypass the worker
+         * and are never throttled.
          */
-        suspend fun refreshAndPersist(context: Context) {
+        suspend fun refreshAndPersist(context: Context, force: Boolean = false) {
+            if (!force && currentlyFresh()) return
             val result = WeatherRepository.refresh(context)
             Settings.cachedTempC = result.snapshot.current.temperatureC
             Settings.cachedCondition = result.facts.conditionLabel
@@ -85,6 +91,14 @@ class WeatherRefreshWorker(context: Context, params: WorkerParameters) :
                     .onFailure { Settings.lastError = "HA push: ${it.message}" }
             }
         }
+
+        private fun currentlyFresh(): Boolean {
+            val last = Settings.cachedUpdatedAtMs
+            if (last <= 0) return false
+            return System.currentTimeMillis() - last < MIN_REFRESH_GAP_MS
+        }
+
+        private const val MIN_REFRESH_GAP_MS = 2 * 60_000L
 
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NAME)

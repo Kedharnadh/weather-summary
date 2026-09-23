@@ -53,15 +53,32 @@ class WeatherSummaryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.snapshot = snapshot
         self.facts = facts
         self.last_error = None
-        try:
-            self.summary = await llm.summarize(
-                self.hass, self.config, facts, llm.sentence_mode(self.config)
-            )
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.warning("Summary generation failed: %s", err)
-            self.summary = openmeteo.fallback_text(facts)
 
-        return self._payload(facts, snapshot, self.summary)
+        # Publish immediately with the deterministic fallback so polling and
+        # the coordinator never block on the (up to 60s) LLM call.
+        fallback = openmeteo.fallback_text(facts)
+        self.summary = fallback
+        payload = self._payload(facts, snapshot, fallback)
+
+        self._schedule_summary(payload, facts)
+        return payload
+
+    def _schedule_summary(
+        self, payload: dict[str, Any], facts: openmeteo.WeatherFacts
+    ) -> None:
+        """Regenerate the sentence in the background once the LLM answers."""
+        config = {**self.config}
+        mode = llm.sentence_mode(self.config)
+
+        async def _finish() -> None:
+            text = await llm.summarize(self.hass, config, facts, mode)
+            if self.data is not payload:
+                _LOGGER.debug("Ignoring stale LLM summary (data refreshed meanwhile)")
+                return
+            self.summary = text
+            self.async_set_updated_data({**payload, "text": text})
+
+        self.hass.async_create_task(_finish(), eager_start=True)
 
     def _payload(
         self,
@@ -69,41 +86,47 @@ class WeatherSummaryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         snapshot: openmeteo.WeatherSnapshot,
         summary: str,
     ) -> dict[str, Any]:
+        """Build the data dict keyed by the documented sensor slugs."""
         return {
-            "summary": summary,
+            "text": summary,
             "temperature": facts.temp_c,
             "apparent_temperature": facts.feels_c,
             "humidity": facts.humidity_pct,
-            "wind_kmh": facts.wind_kmh,
+            "wind": facts.wind_kmh,
             "condition": facts.condition_label,
             "weather_code": snapshot.current.weather_code,
             "is_raining": facts.is_raining_now,
-            "rain_start_in_min": facts.rain_start_in_min,
-            "rain_stop_in_min": facts.rain_stop_in_min,
-            "precip_next_hour_mm": facts.precip_next_hour_mm,
-            "rain_chance_24h_pct": facts.max_chance_rain_24h[0] if facts.max_chance_rain_24h else None,
-            "peak_temp_24h": facts.peak_temp_24h[0] if facts.peak_temp_24h else None,
-            "updated_at": int(time.time() * 1000),
+            "rain_starts_in": facts.rain_start_in_min,
+            "rain_stops_in": facts.rain_stop_in_min,
+            "precipitation_next_hour": facts.precip_next_hour_mm,
+            "rain_chance_next_24_h": facts.max_chance_rain_24h[0] if facts.max_chance_rain_24h else None,
+            "peak_temperature_next_24_h": facts.peak_temp_24h[0] if facts.peak_temp_24h else None,
+            "updated": int(time.time() * 1000),
         }
 
     def apply_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Adopt data pushed from the Android app (weather_summary.ingest_app)."""
+        """Adopt data pushed from the Android app (weather_summary.ingest_app).
+
+        The app still sends its own key names (summary, wind_kmh,
+        rain_start_in_min, ...); map them onto the documented sensor slugs.
+        """
         data = {
-            "summary": payload.get("summary") or "",
+            "text": payload.get("summary") or "",
             "temperature": payload.get("temperature"),
             "apparent_temperature": payload.get("apparent_temperature"),
             "humidity": payload.get("humidity"),
-            "wind_kmh": payload.get("wind_kmh"),
+            "wind": payload.get("wind_kmh"),
             "condition": payload.get("condition"),
             "weather_code": payload.get("weather_code"),
             "is_raining": payload.get("is_raining"),
-            "rain_start_in_min": payload.get("rain_start_in_min"),
-            "rain_stop_in_min": payload.get("rain_stop_in_min"),
-            "precip_next_hour_mm": payload.get("precip_next_hour_mm"),
-            "rain_chance_24h_pct": payload.get("rain_chance_24h_pct"),
-            "peak_temp_24h": payload.get("peak_temp_24h"),
-            "updated_at": int(time.time() * 1000),
+            "rain_starts_in": payload.get("rain_start_in_min"),
+            "rain_stops_in": payload.get("rain_stop_in_min"),
+            "precipitation_next_hour": payload.get("precip_next_hour_mm"),
+            "rain_chance_next_24_h": payload.get("rain_chance_24h_pct"),
+            "peak_temperature_next_24_h": payload.get("peak_temp_24h"),
+            "updated": int(time.time() * 1000),
         }
+        self.summary = data["text"]
         self.async_set_updated_data(data)
         return data
 

@@ -104,15 +104,28 @@ fun WeatherScreen(
                     )
                 }
             }
-            if (state.snapshot?.hourly?.isNotEmpty() == true) {
+            val hourly = state.snapshot?.hourly.orEmpty()
+            item {
+                Text(
+                    "Next 24 hours",
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            if (hourly.isEmpty()) {
                 item {
                     Text(
-                        "Next 24 hours",
-                        fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.titleMedium,
+                        text = when {
+                            state.snapshot == null && state.loading -> "Loading forecast\u2026"
+                            else -> "No hourly forecast available for this provider/location."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 4.dp),
                     )
                 }
-                items(state.snapshot.hourly.take(24)) { hour ->
+            } else {
+                items(hourly.take(24)) { hour ->
                     HourRow(hour)
                 }
             }
@@ -281,13 +294,16 @@ private fun HourRow(hour: HourSlice) {
 }
 
 private fun hourLabel(time: String): String {
+    if (time.isBlank()) return "--:--"
     return try {
         java.time.LocalDateTime.parse(time).let { "%02d:00".format(it.hour) }
     } catch (e: Exception) {
         try {
             java.time.OffsetDateTime.parse(time).let { "%02d:00".format(it.hour) }
         } catch (e2: Exception) {
-            time.substringAfterLast('T').take(5)
+            time.substringAfterLast('T').takeIf { it.isNotBlank() }?.let { t ->
+                t.split(":").getOrNull(0)?.let { h -> "%02d:00".format(h.toIntOrNull() ?: return "--:--") }
+            } ?: "--:--"
         }
     }
 }

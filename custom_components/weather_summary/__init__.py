@@ -7,10 +7,10 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from . import api
-from .const import DOMAIN, PLATFORMS
+from .const import DOMAIN, PLATFORMS, VERSION
 from .coordinator import WeatherSummaryCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,19 +29,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
 
+    _register_device(hass, entry)
+
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"coordinator": coordinator}
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    await api.async_register_http(hass, coordinator)
+    view = await api.async_register_http(hass, coordinator)
     await api.async_register_services(hass, coordinator)
 
     entry.async_on_unload(lambda: api.async_unload_services(hass))
-
-    async def _reload() -> None:
-        coordinator.config = _merged_config(entry)
-        await coordinator.async_refresh()
-
-    entry.async_on_unload(_reload)
+    entry.async_on_unload(lambda: api.async_unregister_http(hass, view))
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     return True
 
 
@@ -52,12 +50,25 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
-async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options changes: update the coordinator config and refresh."""
     coordinator = hass.data.setdefault(DOMAIN, {}).get(entry.entry_id, {}).get("coordinator")
     if coordinator is not None:
         coordinator.config = _merged_config(entry)
         await coordinator.async_refresh()
-    return True
+
+
+def _register_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Create a stable device so entity IDs are weather_summary_<entity>."""
+    dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        entry_type=dr.DeviceEntryType.SERVICE,
+        identifiers={(DOMAIN, entry.entry_id)},
+        name="Weather Summary",
+        manufacturer="Weather Summary",
+        model="Home Assistant integration",
+        sw_version=VERSION,
+    )
 
 
 def _merged_config(entry: ConfigEntry) -> dict[str, Any]:

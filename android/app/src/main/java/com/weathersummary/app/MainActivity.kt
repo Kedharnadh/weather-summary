@@ -1,14 +1,14 @@
 package com.weathersummary.app
 
 import android.Manifest
-import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
-import android.view.View
+import android.view.Window
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -39,7 +40,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        applyThemeToWindow()
+        enableEdgeToEdge()
         setContent {
             WeatherTheme {
                 Surface(
@@ -51,25 +52,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-    private fun applyThemeToWindow() {
-        val dark = when (Settings.themeMode) {
-            Settings.THEME_LIGHT -> false
-            Settings.THEME_SYSTEM -> (resources.configuration.uiMode and
-                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
-            else -> true
-        }
-        val decor = window.decorView
-        if (dark) {
-            decor.systemUiVisibility = decor.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-            window.navigationBarColor = Color.rgb(22, 32, 45)
-        } else {
-            decor.systemUiVisibility = decor.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-            window.navigationBarColor = Color.WHITE
-        }
-        window.setBackgroundDrawable(ColorDrawable(if (dark) Color.rgb(14, 22, 32) else Color.rgb(247, 250, 255)))
-    }
 }
 
 @Composable
@@ -77,6 +59,19 @@ private fun WeatherApp(viewModel: WeatherViewModel) {
     val nav = rememberNavController()
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    val activity = LocalContext.current as? MainActivity
+
+    // Keep system-bar icons legible when the theme is toggled from Settings.
+    val dark = when (Settings.themeMode) {
+        Settings.THEME_LIGHT -> false
+        Settings.THEME_SYSTEM ->
+            (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+        else -> true
+    }
+    LaunchedEffect(dark) {
+        activity?.let { applySystemBarsToWindow(it.window, dark) }
+    }
 
     var foregroundGranted by remember { mutableStateOf(false) }
 
@@ -88,8 +83,11 @@ private fun WeatherApp(viewModel: WeatherViewModel) {
 
     val backgroundLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        viewModel.onLocationPermissionResult(foregroundGranted)
+    ) { grants ->
+        // Background location is only used for fresher GPS fixes while the app is closed.
+        viewModel.onLocationPermissionResult(
+            grants[Manifest.permission.ACCESS_BACKGROUND_LOCATION] == true || foregroundGranted
+        )
     }
 
     val foregroundLauncher = rememberLauncherForActivityResult(
@@ -128,4 +126,10 @@ private fun WeatherApp(viewModel: WeatherViewModel) {
             )
         }
     }
+}
+
+private fun applySystemBarsToWindow(window: Window, dark: Boolean) {
+    val controller = WindowInsetsControllerCompat(window, window.decorView)
+    controller.isAppearanceLightStatusBars = !dark
+    controller.isAppearanceLightNavigationBars = !dark
 }

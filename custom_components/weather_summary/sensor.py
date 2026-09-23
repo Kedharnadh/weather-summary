@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -9,12 +11,9 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    PERCENTAGE,
-    UnitOfSpeed,
-    UnitOfTemperature,
-)
+from homeassistant.const import PERCENTAGE, UnitOfSpeed, UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -23,8 +22,8 @@ from .coordinator import WeatherSummaryCoordinator
 
 SENSOR_ENTITY_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
-        key="summary",
-        name="Weather summary",
+        key="text",
+        name="Text",
         icon="mdi:text-box-outline",
     ),
     SensorEntityDescription(
@@ -49,7 +48,7 @@ SENSOR_ENTITY_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
     ),
     SensorEntityDescription(
-        key="wind_kmh",
+        key="wind",
         name="Wind",
         device_class=SensorDeviceClass.WIND_SPEED,
         native_unit_of_measurement=UnitOfSpeed.KILOMETERS_PER_HOUR,
@@ -61,19 +60,19 @@ SENSOR_ENTITY_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         icon="mdi:weather-partly-cloudy",
     ),
     SensorEntityDescription(
-        key="rain_start_in_min",
+        key="rain_starts_in",
         name="Rain starts in",
         icon="mdi:weather-pouring",
         entity_registry_enabled_default=False,
     ),
     SensorEntityDescription(
-        key="rain_stop_in_min",
+        key="rain_stops_in",
         name="Rain stops in",
         icon="mdi:weather-pouring",
         entity_registry_enabled_default=False,
     ),
     SensorEntityDescription(
-        key="precip_next_hour_mm",
+        key="precipitation_next_hour",
         name="Precipitation next hour",
         icon="mdi:water",
         native_unit_of_measurement="mm",
@@ -81,14 +80,14 @@ SENSOR_ENTITY_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         entity_registry_enabled_default=False,
     ),
     SensorEntityDescription(
-        key="rain_chance_24h_pct",
+        key="rain_chance_next_24_h",
         name="Rain chance next 24 h",
         native_unit_of_measurement=PERCENTAGE,
         icon="mdi:weather-rainy",
         entity_registry_enabled_default=False,
     ),
     SensorEntityDescription(
-        key="peak_temp_24h",
+        key="peak_temperature_next_24_h",
         name="Peak temperature next 24 h",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -96,7 +95,7 @@ SENSOR_ENTITY_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         entity_registry_enabled_default=False,
     ),
     SensorEntityDescription(
-        key="updated_at",
+        key="updated",
         name="Updated",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_registry_enabled_default=False,
@@ -127,15 +126,14 @@ class WeatherSummarySensor(CoordinatorEntity[WeatherSummaryCoordinator], SensorE
         self.entity_description = description
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
         self._attr_has_entity_name = True
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
 
     @property
-    def native_value(self):
+    def native_value(self) -> object | None:
         data = self.coordinator.data or {}
         value = data.get(self.entity_description.key)
         if value is None:
             return None
-        if self.entity_description.key == "updated_at":
-            from datetime import datetime, timezone
-
+        if self.entity_description.key == "updated":
             return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
         return value

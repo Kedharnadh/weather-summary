@@ -97,6 +97,7 @@ cards:
 
 | Card-friendly entity | Purpose |
 | --- | --- |
+| `weather.weather_summary` | Standard weather entity (current conditions + hourly forecast) — usable with any weather card |
 | `sensor.weather_summary_text` | The AI sentence (the main thing to show) |
 | `sensor.weather_summary_condition` | WMO condition label |
 | `sensor.weather_summary_temperature` | Current temperature (°C) |

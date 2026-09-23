@@ -164,7 +164,13 @@ async def _openai_compatible(config: dict[str, Any], prompt: str) -> str | None:
 
 async def _home_assistant_llm(hass, prompt: str) -> str | None:
     """Use Home Assistant's built-in LLM (Home Assistant 2025.2+)."""
-    from homeassistant.ai import get_ai_llm  # local import: newer HA only
+    try:
+        from homeassistant.ai import get_ai_llm  # local import: newer HA only
+    except ImportError as err:
+        raise RuntimeError(
+            "The 'Home Assistant' LLM provider needs Home Assistant 2025.2 or "
+            "newer (homeassistant.ai.get_ai_llm is not available on this install)."
+        ) from err
 
     llm = await get_ai_llm(hass, None)
     response = await llm.async_generate(prompt)

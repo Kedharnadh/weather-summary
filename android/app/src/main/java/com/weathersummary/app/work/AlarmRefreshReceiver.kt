@@ -44,12 +44,20 @@ class AlarmRefreshReceiver : BroadcastReceiver() {
             alarm.cancel(pi)
             val intervalMs = Settings.intervalMinutes.coerceAtLeast(15L) * 60_000L
             val triggerAt = System.currentTimeMillis() + intervalMs
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarm.canScheduleExactAlarms()) {
-                alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-            } else {
-                alarm.setInexactRepeating(AlarmManager.RTC_WAKEUP, triggerAt, intervalMs, pi)
+            when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarm.canScheduleExactAlarms() ->
+                    alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
+                    // The "exact alarms" special app-access can still be revoked at any
+                    // time; fall back to the inexact clock so the widget keeps ticking.
+                    try {
+                        alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+                    } catch (_: SecurityException) {
+                        alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+                    }
+                }
+                else ->
+                    alarm.setInexactRepeating(AlarmManager.RTC_WAKEUP, triggerAt, intervalMs, pi)
             }
         }
 

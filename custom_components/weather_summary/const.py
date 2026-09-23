@@ -5,7 +5,8 @@ from __future__ import annotations
 from homeassistant.const import Platform
 
 DOMAIN = "weather_summary"
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
+VERSION = "1.5.0"
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.WEATHER]
 
 # Config entry keys
 CONF_WEATHER_PROVIDER = "weather_provider"
@@ -19,7 +20,6 @@ CONF_LLM_API_KEY = "llm_api_key"
 CONF_LLM_GEMINI_KEY = "gemini_api_key"
 CONF_LLM_GEMINI_MODEL = "gemini_model"
 CONF_URL = "url"
-CONF_TOKEN = "token"  # reserved for future push-auth (app already uses its own token)
 CONF_SENTENCE_MODE = "sentence_mode"
 
 # Sentence modes

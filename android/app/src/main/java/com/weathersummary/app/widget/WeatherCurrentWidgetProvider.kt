@@ -47,6 +47,8 @@ class WeatherCurrentWidgetProvider : WeatherWidgetBase() {
         if (h >= 0) parts.add("$h%")
         val w = Settings.cachedWindKmh
         if (w.isFinite()) parts.add("${Math.round(w)} km/h")
+        val stale = WeatherWidgetBase.staleSuffix().removePrefix(" · ")
+        if (stale.isNotBlank()) parts.add(stale)
         return parts.joinToString(" \u00b7 ")
     }
 }
