@@ -76,6 +76,13 @@ then restart Home Assistant.
 
 There is no YAML setup — this integration is config-flow only.
 
+### Show it on a dashboard
+
+The integration only creates sensors — it doesn't add a card automatically.
+Copy-paste one of the ready-made cards from [`docs/DASHBOARD.md`](DASHBOARD.md)
+(Entities, Markdown, Mushroom template, or a radar grid) onto your dashboard to
+see `sensor.weather_summary_text` and friends.
+
 ## Using it from the Android app
 
 The app is provider-agnostic. You can either:

@@ -47,6 +47,7 @@ Everything is **provider-agnostic** so it can be extended to more weather APIs
 | `hacs.json` | HACS manifest (enables installing this repo as a HACS **custom repository**). |
 | `docs/RECIPE.md` | The shared AI prompt recipe + derived-fact definitions used by both the app and HA. |
 | `docs/HA-INTEGRATION.md` | HA integration reference (entities, services, install/update). |
+| `docs/DASHBOARD.md` | Copy-paste dashboard cards to display the summary in HA. |
 
 ## Quick start (Android)
 
