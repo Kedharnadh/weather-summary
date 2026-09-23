@@ -15,10 +15,10 @@
       "missing_url": "An LLM base URL is required for the OpenAI-compatible provider.",
       "missing_gemini_key": "A Gemini API key is required for the Gemini LLM provider.",
       "ha_llm_requires_newer_ha": "The 'Home Assistant' LLM provider needs Home Assistant 2025.2 or newer."
+    },
+    "abort": {
+      "single_instance_allowed": "Already configured. Only a single instance is allowed."
     }
-  },
-  "abort": {
-    "single_instance_allowed": "Already configured. Only a single instance is allowed."
   },
   "options": {
     "step": {
