@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.const import Platform
 
 DOMAIN = "weather_summary"
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.WEATHER]
 
 # Config entry keys
