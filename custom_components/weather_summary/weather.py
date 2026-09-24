@@ -5,7 +5,15 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.weather import (
-    ConditionEntity,
+    ATTR_CONDITION_CLOUDY,
+    ATTR_CONDITION_EXCEPTIONAL,
+    ATTR_CONDITION_FOG,
+    ATTR_CONDITION_LIGHTNING,
+    ATTR_CONDITION_PARTLYCLOUDY,
+    ATTR_CONDITION_POURING,
+    ATTR_CONDITION_RAINY,
+    ATTR_CONDITION_SNOWY,
+    ATTR_CONDITION_SUNNY,
     Forecast,
     WeatherEntity,
     WeatherEntityFeature,
@@ -25,34 +33,34 @@ from .const import DOMAIN
 from .coordinator import WeatherSummaryCoordinator
 
 WMO_TO_CONDITION = {
-    0: ConditionEntity.SUNNY,
-    1: ConditionEntity.PARTLYCLOUDY,
-    2: ConditionEntity.PARTLYCLOUDY,
-    3: ConditionEntity.CLOUDY,
-    45: ConditionEntity.FOGGY,
-    48: ConditionEntity.FOGGY,
-    51: ConditionEntity.RAINY,
-    53: ConditionEntity.RAINY,
-    55: ConditionEntity.RAINY,
-    56: ConditionEntity.RAINY,
-    57: ConditionEntity.RAINY,
-    61: ConditionEntity.RAINY,
-    63: ConditionEntity.RAINY,
-    65: ConditionEntity.POURING,
-    66: ConditionEntity.RAINY,
-    67: ConditionEntity.RAINY,
-    71: ConditionEntity.SNOWY,
-    73: ConditionEntity.SNOWY,
-    75: ConditionEntity.SNOWY,
-    77: ConditionEntity.SNOWY,
-    80: ConditionEntity.RAINY,
-    81: ConditionEntity.RAINY,
-    82: ConditionEntity.POURING,
-    85: ConditionEntity.SNOWY,
-    86: ConditionEntity.SNOWY,
-    95: ConditionEntity.LIGHTNING,
-    96: ConditionEntity.LIGHTNING,
-    99: ConditionEntity.LIGHTNING,
+    0: ATTR_CONDITION_SUNNY,
+    1: ATTR_CONDITION_PARTLYCLOUDY,
+    2: ATTR_CONDITION_PARTLYCLOUDY,
+    3: ATTR_CONDITION_CLOUDY,
+    45: ATTR_CONDITION_FOG,
+    48: ATTR_CONDITION_FOG,
+    51: ATTR_CONDITION_RAINY,
+    53: ATTR_CONDITION_RAINY,
+    55: ATTR_CONDITION_RAINY,
+    56: ATTR_CONDITION_RAINY,
+    57: ATTR_CONDITION_RAINY,
+    61: ATTR_CONDITION_RAINY,
+    63: ATTR_CONDITION_RAINY,
+    65: ATTR_CONDITION_POURING,
+    66: ATTR_CONDITION_RAINY,
+    67: ATTR_CONDITION_RAINY,
+    71: ATTR_CONDITION_SNOWY,
+    73: ATTR_CONDITION_SNOWY,
+    75: ATTR_CONDITION_SNOWY,
+    77: ATTR_CONDITION_SNOWY,
+    80: ATTR_CONDITION_RAINY,
+    81: ATTR_CONDITION_RAINY,
+    82: ATTR_CONDITION_POURING,
+    85: ATTR_CONDITION_SNOWY,
+    86: ATTR_CONDITION_SNOWY,
+    95: ATTR_CONDITION_LIGHTNING,
+    96: ATTR_CONDITION_LIGHTNING,
+    99: ATTR_CONDITION_LIGHTNING,
 }
 
 
@@ -86,11 +94,11 @@ class WeatherSummaryWeather(
     def condition(self) -> str | None:
         data = self.coordinator.data or {}
         if data.get("is_raining"):
-            return ConditionEntity.RAINY
+            return ATTR_CONDITION_RAINY
         code = data.get("weather_code")
         if code is None:
             return None
-        return WMO_TO_CONDITION.get(int(code), ConditionEntity.EXCEPTIONAL)
+        return WMO_TO_CONDITION.get(int(code), ATTR_CONDITION_EXCEPTIONAL)
 
     @property
     def native_temperature(self) -> float | None:
@@ -140,7 +148,7 @@ class WeatherSummaryWeather(
         return [
             Forecast(
                 datetime=h.time.replace("Z", "+00:00"),
-                condition=WMO_TO_CONDITION.get(h.weather_code or 0, ConditionEntity.EXCEPTIONAL),
+                condition=WMO_TO_CONDITION.get(h.weather_code or 0, ATTR_CONDITION_EXCEPTIONAL),
                 native_temperature=h.temperature_c,
                 native_precipitation=h.precip_mm,
             )

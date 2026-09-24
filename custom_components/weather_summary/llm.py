@@ -120,7 +120,10 @@ async def generate_text(hass, config: dict[str, Any], prompt: str) -> str | None
         if provider == LLM_HOME_ASSISTANT:
             return await _home_assistant_llm(hass, prompt)
     except Exception as err:  # noqa: BLE001 - never break the sensor
-        _LOGGER.warning("LLM generation failed: %s", err)
+        where = ""
+        if provider == LLM_OPENAI_COMPAT:
+            where = f" (url={config.get('llm_base_url') or 'http://localhost:11434/v1'})"
+        _LOGGER.warning("LLM generation failed (provider=%s%s): %s", provider, where, err)
     return None
 
 

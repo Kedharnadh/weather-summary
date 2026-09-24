@@ -9,7 +9,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 
-from . import api
+# Import platforms eagerly at module load so HA pre-imports them in its import
+# executor instead of doing a blocking import during event-loop setup.
+from . import api, binary_sensor, sensor, weather  # noqa: F401
 from .const import DOMAIN, PLATFORMS, VERSION
 from .coordinator import WeatherSummaryCoordinator
 
