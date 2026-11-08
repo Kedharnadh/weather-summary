@@ -1,0 +1,13 @@
+{
+  "location": "London, UK",
+  "temperature": "—",
+  "condition": "Open the app to refresh",
+  "feels": "",
+  "summary": "Install Weather Summary and open it once to load the latest forecast.",
+  "rain": "The widget updates from the app and periodically in the background.",
+  "updated": "Not updated yet",
+  "iconUrl": "icons/icon-192.png",
+  "appUrl": "./",
+  "lat": 51.5072,
+  "lon": -0.1276
+}

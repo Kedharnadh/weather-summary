@@ -43,6 +43,7 @@ Everything is **provider-agnostic** so it can be extended to more weather APIs
 | Path | What it is |
 | --- | --- |
 | `android/` | Complete Android Studio project (Kotlin + Jetpack Compose). Build with Android Studio or `gradlew`. |
+| `pwa/` | Installable web app (Vite + React + TypeScript) with low-poly 3D SVG icons, offline caching, and GitHub Pages deploy. |
 | `custom_components/weather_summary/` | HACS custom integration for Home Assistant. |
 | `hacs.json` | HACS manifest (enables installing this repo as a HACS **custom repository**). |
 | `docs/RECIPE.md` | The shared AI prompt recipe + derived-fact definitions used by both the app and HA. |
@@ -58,6 +59,29 @@ Everything is **provider-agnostic** so it can be extended to more weather APIs
    - Prefer local AI? Enable **Ollama** (point it at your Home Assistant add-on) — no key, fully private.
    - Already using HA? Pick **Home Assistant** as the AI provider and configure the LLM once in HA.
 4. Add the **"Weather Summary" widget** to your home screen. It refreshes in the background.
+
+## Quick start (PWA)
+
+The `pwa/` directory is a separate, minimal demo: **Open-Meteo** + a
+deterministic template sentence, with **low-poly 3D weather icons** drawn as
+inline SVG. The current-weather card shows the location label, coordinates, and
+timezone, and the dashboard adds **sunrise/sunset** (with daylight length and
+the next event) and **air quality** (European/US AQI plus key pollutants).
+Every card heading and fact tile also uses a matching faceted 3D icon. It
+installs from the browser, keeps the last forecast cached for offline use, and
+can add a **Windows 11 widget** when installed through Edge. It does **not**
+touch the Android app or the HA integration.
+
+```bash
+cd pwa
+npm install
+npm run dev
+```
+
+The demo starts in London; use **Location** to search by place name or pincode
+(e.g. `Tirupati`, `STV Nagar`, `517501`), grant geolocation, or enter
+coordinates. Full docs, scripts, and GitHub Pages setup live in
+[`pwa/README.md`](pwa/README.md).
 
 ## Quick start (Home Assistant)
 
