@@ -66,7 +66,8 @@ The `pwa/` directory is a separate, minimal demo: **Open-Meteo** + a
 deterministic template sentence, with **low-poly 3D weather icons** drawn as
 inline SVG. The current-weather card shows the location label, coordinates, and
 timezone, and the dashboard adds **sunrise/sunset** (with daylight length and
-the next event) and **air quality** (European/US AQI plus key pollutants).
+the next event) and **air quality** (a live US AQI nowcast with the European index
+for reference, plus key pollutants).
 Every card heading and fact tile also uses a matching faceted 3D icon. On first
 open it starts with your **device location**, and a **saved-locations strip**
 shows the live temperature for several places so you can switch between them in

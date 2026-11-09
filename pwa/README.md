@@ -7,7 +7,7 @@ An installable, offline-friendly version of Weather Summary built with
 - deterministic **template sentence** (no LLM yet)
 - **low-poly 3D weather icons** drawn as inline SVG — faceted, depth-sorted meshes
 - **sunrise and sunset** times with daylight length and a "next event" hint
-- **air quality** (European/US AQI + key pollutants) with per-category advice
+- **air quality** (live US AQI nowcast + European reference + key pollutants) with per-category advice
 - location details (label, coordinates, timezone) shown with the current weather
 - **starts with your device location** on first open (London is the fallback)
 - **saved locations** with live temperatures, so you can store several places and
@@ -55,9 +55,13 @@ cached per location, so switching works offline too.
 | Current + hourly + 15-minute rain | [Open-Meteo Forecast](https://open-meteo.com/en/docs) | Keyless, CORS-enabled. Requests `daily=sunrise,sunset` and 3 forecast days. |
 | Air quality | [Open-Meteo Air Quality](https://open-meteo.com/en/docs/air-quality-api) | Keyless. European + US AQI plus PM2.5, PM10, O₃, NO₂, SO₂, CO. Best-effort: a failure resolves to `null` and never blocks the forecast. |
 
-Air quality is requested in parallel with the forecast. The card prefers the
-European AQI when present and falls back to the US index, with banded labels
-(Good → Extremely poor / Hazardous) and short health advice.
+Air quality is requested in parallel with the forecast. The card shows a **US
+AQI nowcast** computed from the current pollutant concentrations (the same
+scale live services such as aqi.in display), with the European AQI as a
+secondary reference. Open-Meteo's own `us_aqi` uses 24-hour averages, so it is
+only a fallback. Labels run from Good → Hazardous with short health advice.
+Because the values are model-based (CAMS), they can read slightly lower than a
+nearby ground monitor; the card says so.
 
 ## Location search
 

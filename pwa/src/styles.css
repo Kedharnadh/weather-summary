@@ -586,6 +586,13 @@ input:focus-visible {
   white-space: nowrap;
 }
 
+.air-note {
+  margin: 0.6rem 0 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
 .pill.aqi.good {
   background: color-mix(in srgb, #16a34a 16%, transparent);
   color: #15803d;

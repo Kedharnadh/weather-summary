@@ -147,11 +147,12 @@ describe('cards', () => {
     expect(markup).toContain('9 h 19 min of daylight today');
   });
 
-  it('renders the air quality card', () => {
+  it('renders the air quality card with a live US nowcast', () => {
     const markup = renderToStaticMarkup(<AirQualityCard air={air} />);
     expect(markup).toContain('Air quality');
-    expect(markup).toContain('European AQI');
-    expect(markup).toContain('68');
+    expect(markup).toContain('US AQI');
+    expect(markup).toContain('81');
+    expect(markup).toContain('EU AQI 68');
     expect(markup).toContain('PM2.5');
   });
 
@@ -163,6 +164,42 @@ describe('cards', () => {
     const hourlyMarkup = renderToStaticMarkup(<HourlyStrip hours={hours} />);
     expect(hourlyMarkup).toContain('Next 12 hours');
     expect(hourlyMarkup).toContain('Now');
+  });
+
+  it('starts the hourly strip at the current hour', () => {
+    const laterHours: HourSlice[] = Array.from({ length: 24 }, (_, index) => ({
+      time: `2026-11-09T${String(index).padStart(2, '0')}:00`,
+      temperatureC: 20 + index,
+      precipProbabilityPct: 10,
+      precipMm: 0,
+      weatherCode: 0,
+      isDay: true,
+    }));
+
+    const markup = renderToStaticMarkup(
+      <HourlyStrip
+        hours={laterHours}
+        startTime="2026-11-09T11:30"
+        current={{
+          time: '2026-11-09T11:30',
+          temperatureC: 25,
+          apparentTemperatureC: 25,
+          humidityPct: 50,
+          windKmh: 5,
+          windGustKmh: 8,
+          weatherCode: 0,
+          precipitationMm: 0,
+          isDay: true,
+          cloudCoverPct: 10,
+        }}
+      />,
+    );
+
+    expect(markup).not.toContain('00:00');
+    expect(markup).toContain('Now');
+    expect(markup).toContain('12:00');
+    expect(markup).toContain('25°');
+    expect((markup.match(/hour-tile/g) ?? []).length).toBe(12);
   });
 
   it('renders saved locations with live temperatures and remove actions', () => {

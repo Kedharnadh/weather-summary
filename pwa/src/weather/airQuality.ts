@@ -2,8 +2,14 @@
  * Air quality helpers.
  *
  * Open-Meteo's air-quality API is public, keyless, and CORS-enabled. It returns
- * both the European AQI (0–100+ with five bands) and the US AQI. The app shows
- * the European index when available and falls back to the US index otherwise.
+ * both the European AQI and the US AQI, plus the individual pollutant
+ * concentrations.
+ *
+ * The card shows a **US AQI nowcast** computed from the current pollutant
+ * concentrations, because that is the scale most consumer AQI services (and
+ * local Indian dashboards such as aqi.in) display. Open-Meteo's own `us_aqi`
+ * uses 24-hour averages, which can read much lower than a live nowcast, so it
+ * is only used as a fallback. The European AQI is shown as a secondary value.
  */
 
 import type { AirQuality } from '../types';
@@ -66,7 +72,8 @@ const EUROPEAN_BANDS: Array<{ max: number; category: AirCategory }> = [
   },
 ];
 
-const US_BANDS: Array<{ max: number; category: AirCategory }> = [
+/** US EPA categories, with inclusive upper bounds. */
+const US_CATEGORIES: Array<{ max: number; category: AirCategory }> = [
   {
     max: 50,
     category: {
@@ -109,7 +116,7 @@ const US_BANDS: Array<{ max: number; category: AirCategory }> = [
   },
 ];
 
-const EXTREMELY_POOR: AirCategory = {
+const HAZARDOUS: AirCategory = {
   tone: 'extremely-poor',
   label: 'Hazardous',
   advice: 'Stay indoors and avoid outdoor activity.',
@@ -125,7 +132,7 @@ function bandFor(value: number, bands: Array<{ max: number; category: AirCategor
   for (const band of bands) {
     if (value < band.max) return band.category;
   }
-  return EXTREMELY_POOR;
+  return HAZARDOUS;
 }
 
 /** Map a European AQI value to its category. */
@@ -134,35 +141,191 @@ export function airCategory(value: number | null | undefined): AirCategory {
   return bandFor(value, EUROPEAN_BANDS);
 }
 
+/** Map a US AQI value to its EPA category (inclusive boundaries). */
+export function usCategory(value: number | null | undefined): AirCategory {
+  if (value == null || !Number.isFinite(value) || value < 0) return UNKNOWN;
+  for (const band of US_CATEGORIES) {
+    if (value <= band.max) return band.category;
+  }
+  return HAZARDOUS;
+}
+
+interface EpaBand {
+  cLo: number;
+  cHi: number;
+  iLo: number;
+  iHi: number;
+}
+
+// US EPA breakpoints. Concentrations are in µg/m³ except where noted.
+const PM25_BANDS: EpaBand[] = [
+  { cLo: 0, cHi: 12.0, iLo: 0, iHi: 50 },
+  { cLo: 12.1, cHi: 35.4, iLo: 51, iHi: 100 },
+  { cLo: 35.5, cHi: 55.4, iLo: 101, iHi: 150 },
+  { cLo: 55.5, cHi: 150.4, iLo: 151, iHi: 200 },
+  { cLo: 150.5, cHi: 250.4, iLo: 201, iHi: 300 },
+  { cLo: 250.5, cHi: 350.4, iLo: 301, iHi: 400 },
+  { cLo: 350.5, cHi: 500.4, iLo: 401, iHi: 500 },
+];
+
+const PM10_BANDS: EpaBand[] = [
+  { cLo: 0, cHi: 54, iLo: 0, iHi: 50 },
+  { cLo: 55, cHi: 154, iLo: 51, iHi: 100 },
+  { cLo: 155, cHi: 254, iLo: 101, iHi: 150 },
+  { cLo: 255, cHi: 354, iLo: 151, iHi: 200 },
+  { cLo: 355, cHi: 424, iLo: 201, iHi: 300 },
+  { cLo: 425, cHi: 504, iLo: 301, iHi: 400 },
+  { cLo: 505, cHi: 604, iLo: 401, iHi: 500 },
+];
+
+// O3 breakpoints are in ppb; Open-Meteo reports µg/m³.
+const O3_BANDS: EpaBand[] = [
+  { cLo: 0, cHi: 54, iLo: 0, iHi: 50 },
+  { cLo: 55, cHi: 70, iLo: 51, iHi: 100 },
+  { cLo: 71, cHi: 85, iLo: 101, iHi: 150 },
+  { cLo: 86, cHi: 105, iLo: 151, iHi: 200 },
+  { cLo: 106, cHi: 200, iLo: 201, iHi: 300 },
+];
+
+// CO breakpoints are in ppm; Open-Meteo reports µg/m³.
+const CO_BANDS: EpaBand[] = [
+  { cLo: 0, cHi: 4.4, iLo: 0, iHi: 50 },
+  { cLo: 4.5, cHi: 9.4, iLo: 51, iHi: 100 },
+  { cLo: 9.5, cHi: 12.4, iLo: 101, iHi: 150 },
+  { cLo: 12.5, cHi: 15.4, iLo: 151, iHi: 200 },
+  { cLo: 15.5, cHi: 30.4, iLo: 201, iHi: 300 },
+  { cLo: 30.5, cHi: 40.4, iLo: 301, iHi: 400 },
+  { cLo: 40.5, cHi: 50.4, iLo: 401, iHi: 500 },
+];
+
+// NO2 breakpoints are in ppb; Open-Meteo reports µg/m³.
+const NO2_BANDS: EpaBand[] = [
+  { cLo: 0, cHi: 53, iLo: 0, iHi: 50 },
+  { cLo: 54, cHi: 100, iLo: 51, iHi: 100 },
+  { cLo: 101, cHi: 360, iLo: 101, iHi: 150 },
+  { cLo: 361, cHi: 649, iLo: 151, iHi: 200 },
+  { cLo: 650, cHi: 1249, iLo: 201, iHi: 300 },
+  { cLo: 1250, cHi: 1649, iLo: 301, iHi: 400 },
+  { cLo: 1650, cHi: 2049, iLo: 401, iHi: 500 },
+];
+
+// SO2 breakpoints are in ppb; Open-Meteo reports µg/m³.
+const SO2_BANDS: EpaBand[] = [
+  { cLo: 0, cHi: 35, iLo: 0, iHi: 50 },
+  { cLo: 36, cHi: 75, iLo: 51, iHi: 100 },
+  { cLo: 76, cHi: 185, iLo: 101, iHi: 150 },
+  { cLo: 186, cHi: 304, iLo: 151, iHi: 200 },
+  { cLo: 305, cHi: 604, iLo: 201, iHi: 300 },
+  { cLo: 605, cHi: 804, iLo: 301, iHi: 400 },
+  { cLo: 805, cHi: 1004, iLo: 401, iHi: 500 },
+];
+
+function epaSubIndex(value: number | null | undefined, bands: EpaBand[]): number | null {
+  if (value == null || !Number.isFinite(value) || value < 0) return null;
+  const last = bands[bands.length - 1];
+  const clamped = Math.min(value, last.cHi);
+  for (const band of bands) {
+    if (clamped <= band.cHi) {
+      if (band.cHi === band.cLo) return band.iLo;
+      const ratio = (clamped - band.cLo) / (band.cHi - band.cLo);
+      return band.iLo + ratio * (band.iHi - band.iLo);
+    }
+  }
+  return last.iHi;
+}
+
+/**
+ * US AQI computed from the current pollutant concentrations (a "nowcast").
+ *
+ * This mirrors how live AQI dashboards combine the current readings and gives
+ * a much more useful number than a 24-hour average during a pollution spike.
+ * Returns null when no pollutant is available.
+ */
+export function usAqiNowcast(air: AirQuality | null | undefined): number | null {
+  if (!air) return null;
+
+  const subIndices = [
+    epaSubIndex(air.pm25, PM25_BANDS),
+    epaSubIndex(air.pm10, PM10_BANDS),
+    // 1 ppb O3 ≈ 1.96 µg/m³, 1 ppm CO ≈ 1145 µg/m³,
+    // 1 ppb NO2 ≈ 1.88 µg/m³, 1 ppb SO2 ≈ 2.62 µg/m³.
+    epaSubIndex(air.ozone == null ? null : air.ozone / 1.96, O3_BANDS),
+    epaSubIndex(air.co == null ? null : air.co / 1145, CO_BANDS),
+    epaSubIndex(air.no2 == null ? null : air.no2 / 1.88, NO2_BANDS),
+    epaSubIndex(air.so2 == null ? null : air.so2 / 2.62, SO2_BANDS),
+  ].filter((value): value is number => value != null);
+
+  if (subIndices.length === 0) return null;
+  return Math.round(Math.max(...subIndices));
+}
+
+export interface AirAlternate {
+  scale: 'European AQI' | 'US AQI';
+  value: number;
+}
+
 export interface AirReading {
   value: number | null;
-  scale: 'European AQI' | 'US AQI' | 'AQI';
+  scale: 'US AQI' | 'European AQI' | 'AQI';
   tone: AirTone;
   label: string;
   advice: string;
+  /** Other available scales, for comparison. */
+  alternates: AirAlternate[];
+  /** True when the primary value was derived from current pollutants. */
+  estimated: boolean;
+}
+
+function europeanAlternate(air: AirQuality): AirAlternate[] {
+  if (air.europeanAqi != null && Number.isFinite(air.europeanAqi)) {
+    return [{ scale: 'European AQI', value: Math.round(air.europeanAqi) }];
+  }
+  return [];
 }
 
 /** Pick the best available index and describe it. */
 export function airReading(air: AirQuality | null | undefined): AirReading {
   if (air) {
-    if (air.europeanAqi != null && Number.isFinite(air.europeanAqi)) {
-      const category = airCategory(air.europeanAqi);
+    // Prefer a live US AQI nowcast: it matches what consumer AQI services show.
+    const nowcast = usAqiNowcast(air);
+    if (nowcast != null) {
+      const category = usCategory(nowcast);
       return {
-        value: air.europeanAqi,
-        scale: 'European AQI',
-        tone: category.tone,
-        label: category.label,
-        advice: category.advice,
-      };
-    }
-    if (air.usAqi != null && Number.isFinite(air.usAqi)) {
-      const category = bandFor(air.usAqi, US_BANDS);
-      return {
-        value: air.usAqi,
+        value: nowcast,
         scale: 'US AQI',
         tone: category.tone,
         label: category.label,
         advice: category.advice,
+        alternates: europeanAlternate(air),
+        estimated: true,
+      };
+    }
+
+    // Fall back to Open-Meteo's 24-hour US index.
+    if (air.usAqi != null && Number.isFinite(air.usAqi)) {
+      const category = usCategory(air.usAqi);
+      return {
+        value: Math.round(air.usAqi),
+        scale: 'US AQI',
+        tone: category.tone,
+        label: category.label,
+        advice: category.advice,
+        alternates: europeanAlternate(air),
+        estimated: false,
+      };
+    }
+
+    // Last resort: the European index.
+    if (air.europeanAqi != null && Number.isFinite(air.europeanAqi)) {
+      const category = airCategory(air.europeanAqi);
+      return {
+        value: Math.round(air.europeanAqi),
+        scale: 'European AQI',
+        tone: category.tone,
+        label: category.label,
+        advice: category.advice,
+        alternates: [],
+        estimated: false,
       };
     }
   }
@@ -173,6 +336,8 @@ export function airReading(air: AirQuality | null | undefined): AirReading {
     tone: UNKNOWN.tone,
     label: UNKNOWN.label,
     advice: UNKNOWN.advice,
+    alternates: [],
+    estimated: false,
   };
 }
 

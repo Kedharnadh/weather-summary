@@ -37,10 +37,16 @@ export function deriveFacts(snapshot: WeatherSnapshot, now = Date.now()): Weathe
     .slice(0, slotsPerHour)
     .reduce((total, value) => total + value, 0);
 
-  const futureHours = snapshot.hourly.filter((hour) => {
-    const time = parseWeatherTime(hour.time);
-    return !time || time.getTime() + 60 * 60_000 > now;
-  });
+  // Anchor on the location's own current time so the 24-hour window is correct
+  // even when viewing a place in another timezone. Both values are local ISO
+  // strings from Open-Meteo, so comparing hour buckets is timezone-safe.
+  const anchorHour = snapshot.current.time.slice(0, 13);
+  const futureHours = anchorHour
+    ? snapshot.hourly.filter((hour) => hour.time.slice(0, 13) >= anchorHour)
+    : snapshot.hourly.filter((hour) => {
+        const time = parseWeatherTime(hour.time);
+        return !time || time.getTime() + 60 * 60_000 > now;
+      });
 
   let maxChanceRain24h: WeatherFacts['maxChanceRain24h'] = null;
   let peakTemp24h: WeatherFacts['peakTemp24h'] = null;

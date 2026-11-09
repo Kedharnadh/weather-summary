@@ -331,7 +331,11 @@ export default function App() {
             <AirQualityCard air={data.snapshot.air} />
           </div>
           <FactsGrid facts={data.facts} />
-          <HourlyStrip hours={data.snapshot.hourly} />
+          <HourlyStrip
+            hours={data.snapshot.hourly}
+            startTime={data.snapshot.current.time}
+            current={data.snapshot.current}
+          />
           <footer className="footer">
             <span>
               Updated {formatUpdated(data.savedAt)} · {formatRelative(data.savedAt)}

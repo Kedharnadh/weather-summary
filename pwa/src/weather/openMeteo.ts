@@ -152,7 +152,7 @@ export async function fetchOpenMeteo(
 
   return {
     current,
-    rain: buildRainSeries(data, new Date()),
+    rain: buildRainSeries(data, current.time),
     hourly: buildHourly(data.hourly),
     timezone: data.timezone ?? 'UTC',
     fetchedAt: Date.now(),
@@ -185,52 +185,50 @@ function buildHourly(series: OmSeries | undefined): HourSlice[] {
   }));
 }
 
-function buildRainSeries(data: OmResponse, now: Date): RainSeries {
+function buildRainSeries(data: OmResponse, anchorTime: string): RainSeries {
   const minutely = data.minutely_15;
   if (minutely?.time?.length && minutely.precipitation?.length) {
-    return alignSeries(minutely.time, minutely.precipitation, 15, now);
+    return alignSeries(minutely.time, minutely.precipitation, 15, anchorTime);
   }
 
   const hourly = data.hourly;
   if (hourly?.time?.length && hourly.precipitation?.length) {
-    return alignSeries(hourly.time, hourly.precipitation, 60, now);
+    return alignSeries(hourly.time, hourly.precipitation, 60, anchorTime);
   }
 
   return { stepMinutes: 60, values: [], startTime: '' };
 }
 
+/**
+ * Trim a precipitation series so its first value is the interval containing
+ * `anchorTime`. Open-Meteo returns location-local ISO strings for both the
+ * series and the current time, so a lexical comparison avoids timezone bugs
+ * when the viewer is in a different timezone from the location.
+ */
 function alignSeries(
   times: string[],
   values: number[],
   stepMinutes: number,
-  now: Date,
+  anchorTime: string,
 ): RainSeries {
   const length = Math.min(times.length, values.length);
-  const stepMs = stepMinutes * 60_000;
-  const nowMs = now.getTime();
-  let start = -1;
+  let start = 0;
 
-  // Prefer the slot that contains "now" so the first value is the current
-  // forecast interval instead of one that has already passed.
-  for (let index = 0; index < length; index += 1) {
-    const time = parseWeatherTime(times[index]);
-    if (time && time.getTime() <= nowMs && nowMs < time.getTime() + stepMs) {
-      start = index;
-      break;
-    }
-  }
-
-  if (start === -1) {
+  if (anchorTime) {
     for (let index = 0; index < length; index += 1) {
-      const time = parseWeatherTime(times[index]);
-      if (time && time.getTime() >= nowMs) {
-        start = index;
-        break;
-      }
+      if (times[index] <= anchorTime) start = index;
+      else break;
     }
+  } else {
+    // Legacy fallback for callers that do not provide an anchor.
+    const nowMs = Date.now();
+    const stepMs = stepMinutes * 60_000;
+    const next = times.findIndex((time) => {
+      const parsed = parseWeatherTime(time);
+      return parsed != null && parsed.getTime() + stepMs > nowMs;
+    });
+    start = next === -1 ? 0 : next;
   }
-
-  if (start === -1) start = 0;
 
   return {
     stepMinutes,

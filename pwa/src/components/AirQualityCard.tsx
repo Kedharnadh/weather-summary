@@ -48,6 +48,19 @@ export function AirQualityCard({ air }: { air: AirQuality | null | undefined }) 
               ))}
             </div>
           )}
+          {(reading.alternates.length > 0 || reading.estimated) && (
+            <p className="air-note">
+              {reading.alternates
+                .map((alternate) =>
+                  `${alternate.scale === 'European AQI' ? 'EU' : 'US'} AQI ${Math.round(
+                    alternate.value,
+                  )}`,
+                )
+                .join(' · ')}
+              {reading.alternates.length > 0 && reading.estimated ? ' · ' : ''}
+              {reading.estimated ? 'nowcast from current pollutants; local monitors may differ' : ''}
+            </p>
+          )}
         </>
       ) : (
         <p className="muted">{reading.advice}</p>
