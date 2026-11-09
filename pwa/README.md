@@ -9,9 +9,12 @@ An installable, offline-friendly version of Weather Summary built with
 - **sunrise and sunset** times with daylight length and a "next event" hint
 - **air quality** (European/US AQI + key pollutants) with per-category advice
 - location details (label, coordinates, timezone) shown with the current weather
+- **starts with your device location** on first open (London is the fallback)
+- **saved locations** with live temperatures, so you can store several places and
+  switch between them in one tap
 - **location search by place name or pincode**, with reverse-geocoded labels
 - a **Windows 11 widget** for the installed PWA (Edge + Widgets Board)
-- cached last forecast in `localStorage`, so the app still shows data offline
+- cached forecast per location in `localStorage`, so the app still shows data offline
 - installable via the browser's **Add to Home Screen / Install** prompt
 
 The Android app and Home Assistant integration are untouched and still live in
@@ -32,7 +35,18 @@ Open the printed local URL. Use **Location** to:
 - **use my location** (the label is reverse-geocoded to a place name), or
 - enter coordinates manually.
 
-The demo starts with London as a fallback.
+On the **first open** the app asks for device location and starts there. If
+permission is denied, unavailable, or times out, it falls back to London and
+shows a dismissible notice.
+
+## Saved locations
+
+Every place you open (device location, search result, or manual coordinates) is
+added to a **saved-locations strip** under the header. Each chip shows the live
+temperature and condition for that place, fetched in a single batched Open-Meteo
+request, so you can compare several locations at a glance. Tap a chip to switch
+the full forecast; tap **×** to remove it. The active place and its forecast are
+cached per location, so switching works offline too.
 
 ## Data sources
 
@@ -137,6 +151,24 @@ How it behaves:
 Widget support is not available on Android or iOS, and it requires Windows 11
 with Edge. The existing Android app keeps its own native widget.
 
+## Weather on the app icon
+
+There is **no cross-platform web API that draws live weather on an installed
+PWA's home-screen icon**. Manifest icons are static images, and JavaScript
+cannot repaint them. What each platform actually allows:
+
+| Platform | Weather on the icon? | Supported alternative |
+| --- | --- | --- |
+| Windows 11 (Edge) | No | **Widgets Board widget** (included); numeric badge via `navigator.setAppBadge` |
+| Android (Chrome/Edge) | No | Numeric badge (launcher-dependent); a native widget needs a Trusted Web Activity or native wrapper |
+| iOS / iPadOS | No | Static icon only; weather via notifications or a native WidgetKit wrapper |
+| macOS (Safari) | No | Numeric Dock badge; no weather text |
+
+The Badging API (`navigator.setAppBadge`) can show a small **number**, but it is
+meant for unread counts, is not supported everywhere, and cannot render a
+temperature icon. The reliable surfaces are the **Windows 11 widget** (already
+included), notifications, and the app page itself.
+
 ## Deploying to GitHub Pages
 
 A workflow is included at `.github/workflows/deploy-pwa.yml`. It builds `pwa/`
@@ -162,8 +194,8 @@ follow automatically).
 - The app shell is precached by the generated service worker.
 - Open-Meteo forecast and air-quality responses each use a short `NetworkFirst`
   cache (1 hour).
-- The last successful snapshot is also saved in `localStorage`, so the UI has
-  something to show even when the network is unavailable.
+- The last successful snapshot is also saved in `localStorage` **per saved
+  location**, so switching places still works when the network is unavailable.
 
 ## PWA limitations
 

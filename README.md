@@ -67,10 +67,12 @@ deterministic template sentence, with **low-poly 3D weather icons** drawn as
 inline SVG. The current-weather card shows the location label, coordinates, and
 timezone, and the dashboard adds **sunrise/sunset** (with daylight length and
 the next event) and **air quality** (European/US AQI plus key pollutants).
-Every card heading and fact tile also uses a matching faceted 3D icon. It
-installs from the browser, keeps the last forecast cached for offline use, and
-can add a **Windows 11 widget** when installed through Edge. It does **not**
-touch the Android app or the HA integration.
+Every card heading and fact tile also uses a matching faceted 3D icon. On first
+open it starts with your **device location**, and a **saved-locations strip**
+shows the live temperature for several places so you can switch between them in
+one tap. It installs from the browser, keeps each location's forecast cached for
+offline use, and can add a **Windows 11 widget** when installed through Edge. It
+does **not** touch the Android app or the HA integration.
 
 ```bash
 cd pwa
@@ -78,10 +80,11 @@ npm install
 npm run dev
 ```
 
-The demo starts in London; use **Location** to search by place name or pincode
-(e.g. `Tirupati`, `STV Nagar`, `517501`), grant geolocation, or enter
-coordinates. Full docs, scripts, and GitHub Pages setup live in
-[`pwa/README.md`](pwa/README.md).
+The first open asks for device location (London is the fallback). Use
+**Location** to search by place name or pincode (e.g. `Tirupati`, `STV Nagar`,
+`517501`), grant geolocation, or enter coordinates; every place you open is kept
+in the saved-locations strip for one-tap switching. Full docs, scripts, and
+GitHub Pages setup live in [`pwa/README.md`](pwa/README.md).
 
 ## Quick start (Home Assistant)
 

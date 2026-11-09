@@ -1,6 +1,7 @@
 import type {
   CurrentWeather,
   HourSlice,
+  LocationSettings,
   RainSeries,
   SunTimes,
   WeatherSnapshot,
@@ -56,6 +57,52 @@ interface OmResponse {
 
 function num(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/** A one-line current-conditions reading for the saved-locations strip. */
+export interface LocationGlance {
+  temperatureC: number | null;
+  weatherCode: number | null;
+  isDay: boolean | null;
+}
+
+interface OmGlanceResponse {
+  current?: Record<string, unknown>;
+}
+
+/**
+ * Fetch current conditions for several places in a single request. Open-Meteo
+ * accepts comma-separated coordinates and returns an array in the same order.
+ */
+export async function fetchGlances(
+  locations: LocationSettings[],
+  signal?: AbortSignal,
+): Promise<LocationGlance[]> {
+  if (locations.length === 0) return [];
+
+  const params = new URLSearchParams({
+    latitude: locations.map((location) => location.lat).join(','),
+    longitude: locations.map((location) => location.lon).join(','),
+    current: 'temperature_2m,weather_code,is_day',
+    timezone: 'auto',
+  });
+
+  const response = await fetch(`${API_URL}?${params.toString()}`, { signal });
+  if (!response.ok) {
+    throw new Error(`Open-Meteo returned HTTP ${response.status}.`);
+  }
+
+  const data = (await response.json()) as OmGlanceResponse | OmGlanceResponse[];
+  const list = Array.isArray(data) ? data : [data];
+
+  return locations.map((_, index) => {
+    const current = list[index]?.current ?? {};
+    return {
+      temperatureC: num(current.temperature_2m),
+      weatherCode: num(current.weather_code),
+      isDay: typeof current.is_day === 'number' ? current.is_day === 1 : null,
+    };
+  });
 }
 
 function str(value: unknown): string {

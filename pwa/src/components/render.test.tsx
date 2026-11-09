@@ -1,8 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { locationKey } from '../storage';
 import type {
   AirQuality,
   HourSlice,
+  LocationSettings,
   RainSeries,
   SunTimes,
   WeatherFacts,
@@ -12,6 +14,7 @@ import { CardIcon, type CardIconKind } from './CardIcon';
 import { FactsGrid } from './FactsGrid';
 import { HourlyStrip } from './HourlyStrip';
 import { RainTimeline } from './RainTimeline';
+import { SavedLocations } from './SavedLocations';
 import { SummaryCard } from './SummaryCard';
 import { SunCard } from './SunCard';
 import { WeatherIcon, weatherIconKind, type WeatherIconKind } from './WeatherIcon';
@@ -160,6 +163,52 @@ describe('cards', () => {
     const hourlyMarkup = renderToStaticMarkup(<HourlyStrip hours={hours} />);
     expect(hourlyMarkup).toContain('Next 12 hours');
     expect(hourlyMarkup).toContain('Now');
+  });
+
+  it('renders saved locations with live temperatures and remove actions', () => {
+    const saved: LocationSettings[] = [
+      { lat: 51.5072, lon: -0.1276, label: 'London, UK' },
+      { lat: 13.6288, lon: 79.4192, label: 'Tirupati, India' },
+    ];
+    const markup = renderToStaticMarkup(
+      <SavedLocations
+        saved={saved}
+        active={saved[0]}
+        glances={{
+          [locationKey(51.5072, -0.1276)]: {
+            temperatureC: 11.4,
+            weatherCode: 61,
+            isDay: true,
+          },
+        }}
+        onSelect={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(markup).toContain('London, UK');
+    expect(markup).toContain('11° · Rain');
+    expect(markup).toContain('Tirupati, India');
+    expect(markup).toContain('Tap to view');
+    expect(markup).toContain('Remove London, UK');
+    expect(markup).toContain('aria-pressed="true"');
+  });
+
+  it('shows an unsaved active place without a remove button', () => {
+    const saved: LocationSettings[] = [{ lat: 1, lon: 2, label: 'Saved place' }];
+    const active: LocationSettings = { lat: 3, lon: 4, label: 'Current place' };
+    const markup = renderToStaticMarkup(
+      <SavedLocations
+        saved={saved}
+        active={active}
+        glances={{}}
+        onSelect={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(markup).toContain('Current place');
+    expect(markup).not.toContain('Remove Current place');
   });
 
   it('renders the summary card with location details', () => {

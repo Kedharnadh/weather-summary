@@ -9,9 +9,18 @@ interface Props {
   onApply: (location: LocationSettings) => void;
   onLocate: () => void;
   locating: boolean;
+  isSaved: boolean;
+  onSave: () => void;
 }
 
-export function LocationBar({ location, onApply, onLocate, locating }: Props) {
+export function LocationBar({
+  location,
+  onApply,
+  onLocate,
+  locating,
+  isSaved,
+  onSave,
+}: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -77,6 +86,13 @@ export function LocationBar({ location, onApply, onLocate, locating }: Props) {
           <CardIcon kind="location" size={24} decorative />
           <h2>Location</h2>
         </div>
+        {isSaved ? (
+          <span className="pill saved-pill">Saved</span>
+        ) : (
+          <button type="button" className="ghost small" onClick={onSave}>
+            Save current
+          </button>
+        )}
       </div>
 
       <p className="location-current">

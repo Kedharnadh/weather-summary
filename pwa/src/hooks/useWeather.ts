@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { loadWeather, saveWeather } from '../storage';
+import { loadWeatherFor, locationKey, saveWeatherFor } from '../storage';
 import type { LocationSettings, StoredWeather } from '../types';
 import { deriveFacts } from '../weather/facts';
 import { fallbackSentence } from '../weather/fallback';
@@ -12,29 +12,45 @@ interface WeatherState {
   loading: boolean;
   refreshing: boolean;
   error: string | null;
+  /** Which location the current `data` belongs to. */
+  key: string | null;
+}
+
+interface Options {
+  /** Skip fetching while the app is still resolving the first location. */
+  enabled?: boolean;
 }
 
 const AUTO_REFRESH_MS = 10 * 60_000;
 
-export function useWeather(location: LocationSettings) {
-  const cached = useRef<StoredWeather | null>(loadWeather());
-  const [state, setState] = useState<WeatherState>(() => ({
-    data: cached.current,
-    loading: cached.current == null,
-    refreshing: false,
-    error: null,
-  }));
+export function useWeather(location: LocationSettings, options?: Options) {
+  const enabled = options?.enabled !== false;
+  const key = locationKey(location.lat, location.lon);
+
+  const [state, setState] = useState<WeatherState>(() => {
+    const cached = enabled ? loadWeatherFor(location) : null;
+    return {
+      data: cached,
+      loading: enabled && cached == null,
+      refreshing: false,
+      error: null,
+      key: enabled ? key : null,
+    };
+  });
   const abortRef = useRef<AbortController | null>(null);
+  const lastKey = useRef(key);
 
   const refresh = useCallback(
-    async (options?: { silent?: boolean }) => {
+    async (refreshOptions?: { silent?: boolean }) => {
+      if (!enabled) return;
+
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
       setState((previous) => ({
         ...previous,
-        loading: previous.data == null && !options?.silent,
+        loading: previous.data == null && !refreshOptions?.silent,
         refreshing: previous.data != null,
         error: null,
       }));
@@ -53,8 +69,8 @@ export function useWeather(location: LocationSettings) {
           summary: fallbackSentence(facts),
           savedAt: Date.now(),
         };
-        setState({ data: stored, loading: false, refreshing: false, error: null });
-        saveWeather(stored);
+        setState({ data: stored, loading: false, refreshing: false, error: null, key });
+        saveWeatherFor(location, stored);
         void publishWidgetData(stored, location);
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -68,8 +84,23 @@ export function useWeather(location: LocationSettings) {
         }));
       }
     },
-    [location.lat, location.lon, location.label],
+    [enabled, key, location.lat, location.lon, location.label],
   );
+
+  // When the active place changes, show that place's own cached forecast
+  // instead of the previous location's weather until the new fetch lands.
+  useEffect(() => {
+    if (lastKey.current === key) return;
+    lastKey.current = key;
+    const cached = enabled ? loadWeatherFor(location) : null;
+    setState({
+      data: cached,
+      loading: enabled && cached == null,
+      refreshing: false,
+      error: null,
+      key: enabled ? key : null,
+    });
+  }, [enabled, key, location]);
 
   useEffect(() => {
     void refresh();
@@ -94,8 +125,13 @@ export function useWeather(location: LocationSettings) {
     return () => window.clearInterval(interval);
   }, [refresh]);
 
+  const matches = state.key === key;
+
   return {
-    ...state,
+    data: matches ? state.data : null,
+    loading: matches ? state.loading : enabled,
+    refreshing: matches ? state.refreshing : false,
+    error: matches ? state.error : null,
     refresh: () => void refresh({ silent: true }),
   };
 }
