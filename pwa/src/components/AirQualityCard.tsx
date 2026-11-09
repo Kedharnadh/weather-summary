@@ -48,19 +48,22 @@ export function AirQualityCard({ air }: { air: AirQuality | null | undefined }) 
               ))}
             </div>
           )}
-          {(reading.alternates.length > 0 || reading.estimated) && (
-            <p className="air-note">
-              {reading.alternates
-                .map((alternate) =>
-                  `${alternate.scale === 'European AQI' ? 'EU' : 'US'} AQI ${Math.round(
-                    alternate.value,
-                  )}`,
-                )
-                .join(' · ')}
-              {reading.alternates.length > 0 && reading.estimated ? ' · ' : ''}
-              {reading.estimated ? 'nowcast from current pollutants; local monitors may differ' : ''}
-            </p>
-          )}
+          {(() => {
+            const parts = reading.alternates.map(
+              (alternate) =>
+                `${alternate.scale === 'European AQI' ? 'EU' : 'US'} AQI ${Math.round(
+                  alternate.value,
+                )}`,
+            );
+            if (reading.source === 'waqi') {
+              parts.push(
+                `Ground monitor${reading.station ? ` · ${reading.station}` : ''}`,
+              );
+            } else if (reading.estimated) {
+              parts.push('nowcast from current pollutants; local monitors may differ');
+            }
+            return parts.length > 0 ? <p className="air-note">{parts.join(' · ')}</p> : null;
+          })()}
         </>
       ) : (
         <p className="muted">{reading.advice}</p>

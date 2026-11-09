@@ -1,4 +1,5 @@
 import type { SunTimes } from '../types';
+import { useSettings } from '../SettingsContext';
 import { formatHour } from '../weather/format';
 import { daylightMinutes, formatDuration, nextSunEvent } from '../weather/sun';
 import { CardIcon } from './CardIcon';
@@ -10,6 +11,7 @@ export function SunCard({
   sun: SunTimes | null | undefined;
   timezone?: string;
 }) {
+  const { clock } = useSettings();
   const next = nextSunEvent(sun, new Date(), timezone);
   const daylight = daylightMinutes(sun);
 
@@ -22,7 +24,7 @@ export function SunCard({
         </div>
         {next && (
           <span className="pill sun">
-            {next.kind === 'sunrise' ? 'Sunrise' : 'Sunset'} {formatHour(next.time)}
+            {next.kind === 'sunrise' ? 'Sunrise' : 'Sunset'} {formatHour(next.time, clock)}
           </span>
         )}
       </div>
@@ -31,12 +33,12 @@ export function SunCard({
         <div className="sun-event">
           <CardIcon kind="sunrise" size={38} />
           <span className="sun-label">Sunrise</span>
-          <strong>{sun?.sunrise ? formatHour(sun.sunrise) : '—'}</strong>
+          <strong>{sun?.sunrise ? formatHour(sun.sunrise, clock) : '—'}</strong>
         </div>
         <div className="sun-event">
           <CardIcon kind="sunset" size={38} />
           <span className="sun-label">Sunset</span>
-          <strong>{sun?.sunset ? formatHour(sun.sunset) : '—'}</strong>
+          <strong>{sun?.sunset ? formatHour(sun.sunset, clock) : '—'}</strong>
         </div>
       </div>
 

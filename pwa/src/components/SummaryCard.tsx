@@ -1,5 +1,7 @@
 import type { LocationSettings, WeatherFacts } from '../types';
+import { useSettings } from '../SettingsContext';
 import { formatCoordinates } from '../weather/format';
+import { formatTemp } from '../weather/units';
 import { CardIcon } from './CardIcon';
 import { WeatherIcon, weatherIconKind } from './WeatherIcon';
 
@@ -20,7 +22,8 @@ export function SummaryCard({
   location,
   timezone,
 }: Props) {
-  const feels = facts.feelsC != null ? Math.round(facts.feelsC) : Math.round(facts.tempC);
+  const { units } = useSettings();
+  const feels = facts.feelsC ?? facts.tempC;
 
   return (
     <section className="summary-card" aria-label="Weather summary">
@@ -38,7 +41,8 @@ export function SummaryCard({
         </p>
         <h2 className="summary-text">{summary}</h2>
         <p className="summary-meta">
-          {Math.round(facts.tempC)}° · {facts.conditionLabel} · feels like {feels}°
+          {formatTemp(facts.tempC, units)} · {facts.conditionLabel} · feels like{' '}
+          {formatTemp(feels, units)}
         </p>
       </div>
     </section>

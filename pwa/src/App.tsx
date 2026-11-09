@@ -1,19 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { clearTemperatureBadge, setTemperatureBadge } from './badge';
 import { AirQualityCard } from './components/AirQualityCard';
 import { FactsGrid } from './components/FactsGrid';
 import { HourlyStrip } from './components/HourlyStrip';
+import { IconButton } from './components/IconButton';
 import { LocationBar } from './components/LocationBar';
 import { RainTimeline } from './components/RainTimeline';
 import { SavedLocations } from './components/SavedLocations';
+import { SettingsBar } from './components/SettingsBar';
 import { SummaryCard } from './components/SummaryCard';
 import { SunCard } from './components/SunCard';
+import { UiIcon } from './components/UiIcon';
 import { WeatherIcon } from './components/WeatherIcon';
 import { useInstallPrompt } from './hooks/useInstallPrompt';
 import { useLocationGlances } from './hooks/useLocationGlances';
+import { useNow } from './hooks/useNow';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useWeather } from './hooks/useWeather';
+import { SettingsProvider, useSettings } from './SettingsContext';
+import { loadSettings, saveSettings, type AppSettings } from './settings';
 import {
   DEFAULT_LOCATION,
   MAX_SAVED_LOCATIONS,
+  findSavedMatch,
   isSameLocation,
   loadActiveLocation,
   loadLocations,
@@ -22,10 +31,33 @@ import {
   saveLocations,
 } from './storage';
 import type { LocationSettings } from './types';
-import { formatRelative, formatUpdated } from './weather/format';
-import { isGenericLabel, reverseGeocode } from './weather/geocode';
+import { displayCity } from './weather/city';
+import { formatHour, formatRelative, formatUpdated } from './weather/format';
+import { isGenericLabel, reverseGeocodeDetails } from './weather/geocode';
+
+/** A forecast older than this is flagged as stale in the footer. */
+const STALE_AFTER_MS = 60 * 60_000;
 
 export default function App() {
+  const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
+
+  const updateSettings = useCallback((patch: Partial<AppSettings>) => {
+    setSettings((previous) => {
+      const next = { ...previous, ...patch };
+      saveSettings(next);
+      return next;
+    });
+  }, []);
+
+  return (
+    <SettingsProvider settings={settings} updateSettings={updateSettings}>
+      <AppShell />
+    </SettingsProvider>
+  );
+}
+
+function AppShell() {
+  const settings = useSettings();
   const [initial] = useState(() => {
     const active = loadActiveLocation();
     const saved = loadLocations();
@@ -41,26 +73,36 @@ export default function App() {
   const [booting, setBooting] = useState(initial.needsLocate);
   const [notice, setNotice] = useState<string | null>(null);
   const [showLocation, setShowLocation] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [updateReady, setUpdateReady] = useState(false);
+  const [offlineReady, setOfflineReady] = useState(false);
   const { canInstall, install } = useInstallPrompt();
+  const online = useOnlineStatus();
+  const now = useNow();
 
   // Replace placeholder labels ("My location", "13.62, 79.43") with a real
-  // place name, in both the active location and the saved list.
+  // place name and city, in both the active location and the saved list.
   const resolveLabel = useCallback((target: LocationSettings) => {
     if (!isGenericLabel(target.label)) return;
     const key = locationKey(target.lat, target.lon);
 
-    void reverseGeocode(target.lat, target.lon)
-      .then((label) => {
-        if (!label) return;
+    void reverseGeocodeDetails(target.lat, target.lon)
+      .then((details) => {
+        if (!details) return;
+        const patch: Partial<LocationSettings> = {};
+        if (details.label) patch.label = details.label;
+        if (details.city) patch.city = details.city;
+        if (Object.keys(patch).length === 0) return;
+
         setLocation((current) =>
           current && locationKey(current.lat, current.lon) === key
-            ? { ...current, label }
+            ? { ...current, ...patch }
             : current,
         );
         setLocations((previous) =>
           previous.map((item) =>
-            locationKey(item.lat, item.lon) === key ? { ...item, label } : item,
+            locationKey(item.lat, item.lon) === key ? { ...item, ...patch } : item,
           ),
         );
       })
@@ -71,13 +113,18 @@ export default function App() {
 
   const remember = useCallback((target: LocationSettings) => {
     setLocations((previous) => {
-      const key = locationKey(target.lat, target.lon);
-      const index = previous.findIndex(
-        (item) => locationKey(item.lat, item.lon) === key,
-      );
-      if (index >= 0) {
+      const match = findSavedMatch(previous, target);
+      if (match) {
+        const index = previous.indexOf(match);
         const next = previous.slice();
-        next[index] = { ...next[index], label: target.label };
+        next[index] = {
+          ...match,
+          lat: target.lat,
+          lon: target.lon,
+          // Never replace a real place name with a placeholder label.
+          label: isGenericLabel(target.label) ? match.label : target.label,
+          city: target.city?.trim() || match.city,
+        };
         return next;
       }
       return [...previous, target].slice(-MAX_SAVED_LOCATIONS);
@@ -96,6 +143,58 @@ export default function App() {
     [remember, resolveLabel],
   );
 
+  /**
+   * Apply a device fix. Reverse geocoding runs first so the city can be
+   * compared with the saved list: using "my location" in a city that is
+   * already saved should switch to that place, not add a near-duplicate.
+   */
+  const applyDeviceLocation = useCallback(
+    async (coords: { lat: number; lon: number }) => {
+      const fallback: LocationSettings = { ...coords, label: 'My location' };
+      let target = fallback;
+
+      try {
+        const details = await Promise.race([
+          reverseGeocodeDetails(coords.lat, coords.lon),
+          new Promise<null>((resolve) =>
+            window.setTimeout(() => resolve(null), 4000),
+          ),
+        ]);
+        if (details) {
+          target = {
+            ...coords,
+            label: details.label || 'My location',
+            ...(details.city ? { city: details.city } : {}),
+          };
+        }
+      } catch {
+        // Keep the placeholder label; the proximity match below still applies.
+      }
+
+      const match = findSavedMatch(locations, target, {
+        matchCity: true,
+        maxKm: 5,
+      });
+
+      if (match) {
+        const merged: LocationSettings = {
+          ...match,
+          lat: target.lat,
+          lon: target.lon,
+          city: match.city ?? target.city,
+        };
+        setLocations((previous) =>
+          previous.map((item) => (isSameLocation(item, match) ? merged : item)),
+        );
+        applyLocation(merged, { remember: false });
+        return;
+      }
+
+      applyLocation(target, { remember: true });
+    },
+    [applyLocation, locations],
+  );
+
   const removeLocation = useCallback(
     (target: LocationSettings) => {
       const remaining = locations.filter((item) => !isSameLocation(item, target));
@@ -107,14 +206,53 @@ export default function App() {
     [location, locations],
   );
 
+  const reorderLocation = useCallback((index: number, direction: -1 | 1) => {
+    setLocations((previous) => {
+      const target = index + direction;
+      if (
+        index < 0 ||
+        index >= previous.length ||
+        target < 0 ||
+        target >= previous.length
+      ) {
+        return previous;
+      }
+      const next = previous.slice();
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }, []);
+
+  const renameLocation = useCallback((target: LocationSettings, label: string) => {
+    const key = locationKey(target.lat, target.lon);
+    setLocations((previous) =>
+      previous.map((item) =>
+        locationKey(item.lat, item.lon) === key ? { ...item, label } : item,
+      ),
+    );
+    setLocation((current) =>
+      current && locationKey(current.lat, current.lon) === key
+        ? { ...current, label }
+        : current,
+    );
+  }, []);
+
+  const clearLocations = useCallback(() => {
+    setLocations([]);
+  }, []);
+
   const saveCurrent = useCallback(() => {
     if (location) remember(location);
   }, [location, remember]);
 
   const weatherLocation = location ?? DEFAULT_LOCATION;
-  const { data, loading, refreshing, error, refresh } = useWeather(weatherLocation, {
-    enabled: location != null,
-  });
+  const { data, loading, refreshing, error, refresh, retry } = useWeather(
+    weatherLocation,
+    {
+      enabled: location != null,
+      waqiToken: settings.waqiToken,
+    },
+  );
 
   // Include the active place in the strip even if it is not saved yet.
   const glanceLocations = useMemo(() => {
@@ -202,7 +340,30 @@ export default function App() {
     saveLocations(locations);
   }, [locations]);
 
-  const locate = () => {
+  // Service-worker update and offline-ready notifications, raised by main.tsx.
+  useEffect(() => {
+    const onUpdate = () => setUpdateReady(true);
+    const onOffline = () => setOfflineReady(true);
+    window.addEventListener('pwa:update-available', onUpdate);
+    window.addEventListener('pwa:offline-ready', onOffline);
+    return () => {
+      window.removeEventListener('pwa:update-available', onUpdate);
+      window.removeEventListener('pwa:offline-ready', onOffline);
+    };
+  }, []);
+
+  // Mirror the current temperature on the app icon where the platform allows.
+  useEffect(() => {
+    if (data) {
+      void setTemperatureBadge(data.facts.tempC, settings.units);
+    } else {
+      void clearTemperatureBadge();
+    }
+  }, [data, settings.units]);
+
+  useEffect(() => () => void clearTemperatureBadge(), []);
+
+  const locate = useCallback(() => {
     if (!('geolocation' in navigator)) {
       setNotice('Geolocation is not available in this browser.');
       return;
@@ -211,12 +372,10 @@ export default function App() {
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLocating(false);
-        applyLocation({
+        void applyDeviceLocation({
           lat: position.coords.latitude,
           lon: position.coords.longitude,
-          label: 'My location',
-        });
+        }).finally(() => setLocating(false));
       },
       (geoError) => {
         setLocating(false);
@@ -224,50 +383,134 @@ export default function App() {
       },
       { enableHighAccuracy: false, timeout: 10_000, maximumAge: 10 * 60_000 },
     );
-  };
+  }, [applyDeviceLocation]);
+
+  // Manifest shortcuts open the app with ?location=1 or ?locate=1.
+  const shortcutsHandled = useRef(false);
+  useEffect(() => {
+    if (shortcutsHandled.current) return;
+    shortcutsHandled.current = true;
+
+    const params = new URLSearchParams(window.location.search);
+    const wantsLocation = params.has('location') || params.has('locate');
+    if (!wantsLocation) return;
+
+    setShowLocation(true);
+    if (params.has('locate')) locate();
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('location');
+    url.searchParams.delete('locate');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [locate]);
 
   const activeIsSaved = location
     ? locations.some((item) => isSameLocation(item, location))
     : false;
+  const stale = data != null && now - data.savedAt > STALE_AFTER_MS;
+  const city = location ? displayCity(location) : null;
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main">
+        Skip to weather
+      </a>
+
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
-            <WeatherIcon kind="partly-cloudy-day" size={38} />
+            <WeatherIcon kind="partly-cloudy-day" size={34} />
           </span>
-          <div>
+          <div className="brand-copy">
             <h1>Weather Summary</h1>
-            <p>{location?.label ?? 'Finding your location…'}</p>
+            <p title={location?.label}>{city ?? 'Finding your location…'}</p>
           </div>
         </div>
 
-        <div className="topbar-actions">
-          {canInstall && (
-            <button type="button" className="ghost" onClick={() => void install()}>
-              Install
-            </button>
-          )}
-          <button
-            type="button"
-            className="ghost"
+        <div className="topbar-actions" role="group" aria-label="App actions">
+          <IconButton
+            label={showLocation ? 'Hide location picker' : 'Choose location'}
+            icon={<UiIcon name="location" />}
             onClick={() => setShowLocation((value) => !value)}
-            aria-expanded={showLocation}
             disabled={booting}
-          >
-            Location
-          </button>
-          <button
-            type="button"
-            className="primary"
+            className={showLocation ? 'is-active' : undefined}
+          />
+          {canInstall && (
+            <IconButton
+              label="Install app"
+              icon={<UiIcon name="install" />}
+              onClick={() => void install()}
+            />
+          )}
+          <IconButton
+            label={showSettings ? 'Hide settings' : 'Settings'}
+            icon={<UiIcon name="settings" />}
+            onClick={() => setShowSettings((value) => !value)}
+            className={showSettings ? 'is-active' : undefined}
+          />
+          <IconButton
+            label={refreshing ? 'Refreshing weather' : 'Refresh weather'}
+            icon={<UiIcon name="refresh" />}
             onClick={refresh}
+            variant="primary"
             disabled={loading || refreshing || booting}
-          >
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
+            busy={refreshing}
+          />
         </div>
       </header>
+
+      {updateReady && (
+        <div className="banner notice update-banner" role="status">
+          <span className="banner-copy">
+            <UiIcon name="update" size={18} />
+            <span>A new version is ready.</span>
+          </span>
+          <span className="banner-actions">
+            <button
+              type="button"
+              className="primary small"
+              onClick={() => window.dispatchEvent(new Event('pwa:apply-update'))}
+            >
+              Reload
+            </button>
+            <button
+              type="button"
+              className="ghost small"
+              onClick={() => setUpdateReady(false)}
+            >
+              Later
+            </button>
+          </span>
+        </div>
+      )}
+
+      {!online && (
+        <div className="banner offline" role="status">
+          <span className="banner-copy">
+            <UiIcon name="offline" size={18} />
+            <span>
+              You are offline. Showing the last saved forecast; refresh resumes when
+              the connection returns.
+            </span>
+          </span>
+        </div>
+      )}
+
+      {offlineReady && online && (
+        <div className="banner notice" role="status">
+          <span className="banner-copy">
+            <UiIcon name="check" size={18} />
+            <span>Saved for offline use. You can open this app without a connection.</span>
+          </span>
+          <button
+            type="button"
+            className="ghost small"
+            onClick={() => setOfflineReady(false)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {location && (
         <SavedLocations
@@ -276,6 +519,9 @@ export default function App() {
           glances={glances}
           onSelect={applyLocation}
           onRemove={removeLocation}
+          onReorder={reorderLocation}
+          onRename={renameLocation}
+          onClear={clearLocations}
         />
       )}
 
@@ -290,6 +536,8 @@ export default function App() {
         />
       )}
 
+      {showSettings && <SettingsBar onClose={() => setShowSettings(false)} />}
+
       {notice && !booting && (
         <div className="banner notice" role="status">
           <span>{notice}</span>
@@ -301,13 +549,18 @@ export default function App() {
 
       {error && (
         <div className="banner error" role="alert">
-          {error}
-          {data ? ' Showing the last saved forecast.' : ''}
+          <span>
+            {error}
+            {data ? ' Showing the last saved forecast.' : ''}
+          </span>
+          <button type="button" className="ghost small" onClick={retry}>
+            Retry now
+          </button>
         </div>
       )}
 
       {booting ? (
-        <main className="content" aria-busy="true" aria-label="Finding your location">
+        <main id="main" className="content" aria-busy="true" aria-label="Finding your location">
           <div className="banner notice" role="status">
             <span>Finding your location…</span>
             <span className="muted">Allow location access to start with your local weather.</span>
@@ -316,7 +569,7 @@ export default function App() {
           <div className="skeleton row-skeleton" />
         </main>
       ) : data ? (
-        <main className="content">
+        <main id="main" className="content">
           <SummaryCard
             summary={data.summary}
             facts={data.facts}
@@ -338,16 +591,40 @@ export default function App() {
           />
           <footer className="footer">
             <span>
-              Updated {formatUpdated(data.savedAt)} · {formatRelative(data.savedAt)}
+              Observed {formatHour(data.snapshot.current.time, settings.clock)} · Updated{' '}
+              {formatUpdated(data.savedAt, settings.clock)} · {formatRelative(data.savedAt)}
             </span>
-            <span>Open-Meteo · cached offline</span>
+            <span className="footer-meta">
+              {stale && (
+                <span
+                  className="pill stale-pill"
+                  title="This forecast is more than an hour old"
+                >
+                  Stale
+                </span>
+              )}
+              <span>Open-Meteo · cached offline</span>
+            </span>
           </footer>
         </main>
       ) : loading ? (
-        <main className="content" aria-busy="true" aria-label="Loading weather">
+        <main id="main" className="content" aria-busy="true" aria-label="Loading weather">
           <div className="skeleton hero-skeleton" />
           <div className="skeleton row-skeleton" />
           <div className="skeleton grid-skeleton" />
+        </main>
+      ) : error ? (
+        <main id="main" className="content">
+          <div className="card empty-state">
+            <h2>Could not load the weather</h2>
+            <p className="muted">
+              Check your connection, then try again. Saved forecasts stay available
+              offline.
+            </p>
+            <button type="button" className="primary" onClick={retry}>
+              Try again
+            </button>
+          </div>
         </main>
       ) : null}
     </div>

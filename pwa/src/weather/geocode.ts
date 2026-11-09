@@ -11,10 +11,14 @@
  * All three services are public, keyless, and CORS-enabled.
  */
 
+import { cityFromLabel } from './city';
+
 export interface PlaceResult {
   lat: number;
   lon: number;
   label: string;
+  /** City name for compact chips, when known. */
+  city?: string;
 }
 
 interface OpenMeteoPlace {
@@ -137,6 +141,29 @@ export function labelFromNominatim(place: NominatimPlace): string {
   return uniqueLabel([primary, secondary, address.state, address.country]);
 }
 
+/** The city (not the neighbourhood) for a Nominatim result. */
+export function cityFromNominatim(place: NominatimPlace): string {
+  const address = place.address ?? {};
+  return (
+    address.city ||
+    address.town ||
+    address.village ||
+    address.municipality ||
+    address.suburb ||
+    address.neighbourhood ||
+    ''
+  ).trim();
+}
+
+/** The city for an Open-Meteo geocoding result (its `name` is the city). */
+export function cityFromOpenMeteo(place: OpenMeteoPlace): string {
+  return (place.name ?? '').trim();
+}
+
+export function cityFromReverse(place: ReversePlace): string {
+  return (place.city || place.locality || '').trim();
+}
+
 export function labelFromReverse(place: ReversePlace): string {
   const primary =
     place.locality && place.locality !== place.city
@@ -150,10 +177,12 @@ function toPlaceFromOpenMeteo(place: OpenMeteoPlace): PlaceResult | null {
   if (typeof place.latitude !== 'number' || typeof place.longitude !== 'number') {
     return null;
   }
+  const city = cityFromOpenMeteo(place);
   return {
     lat: place.latitude,
     lon: place.longitude,
     label: labelFromOpenMeteo(place),
+    ...(city ? { city } : {}),
   };
 }
 
@@ -161,7 +190,9 @@ function toPlaceFromNominatim(place: NominatimPlace): PlaceResult | null {
   const lat = Number(place.lat);
   const lon = Number(place.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  return { lat, lon, label: labelFromNominatim(place) };
+  const label = labelFromNominatim(place);
+  const city = cityFromNominatim(place) || cityFromLabel(label);
+  return { lat, lon, label, ...(city ? { city } : {}) };
 }
 
 function dedupe(places: PlaceResult[]): PlaceResult[] {
@@ -186,11 +217,16 @@ async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
 }
 
 /** Turn coordinates into a human place name, e.g. "Tirupati, Andhra Pradesh, India". */
-export async function reverseGeocode(
+export interface ReverseGeocodeResult {
+  label: string;
+  city: string;
+}
+
+export async function reverseGeocodeDetails(
   lat: number,
   lon: number,
   signal?: AbortSignal,
-): Promise<string | null> {
+): Promise<ReverseGeocodeResult | null> {
   const params = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
@@ -198,7 +234,17 @@ export async function reverseGeocode(
   });
 
   const place = await fetchJson<ReversePlace>(`${REVERSE_URL}?${params.toString()}`, signal);
-  return labelFromReverse(place) || null;
+  const label = labelFromReverse(place);
+  if (!label) return null;
+  return { label, city: cityFromReverse(place) };
+}
+
+export async function reverseGeocode(
+  lat: number,
+  lon: number,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  return (await reverseGeocodeDetails(lat, lon, signal))?.label ?? null;
 }
 
 async function searchNominatim(query: string, signal?: AbortSignal): Promise<PlaceResult[]> {
@@ -275,8 +321,10 @@ async function searchPostalCode(query: string, signal?: AbortSignal): Promise<Pl
   const refined = await Promise.all(
     places.map(async (place) => {
       try {
-        const label = await reverseGeocode(place.lat, place.lon, signal);
-        return label ? { ...place, label } : place;
+        const details = await reverseGeocodeDetails(place.lat, place.lon, signal);
+        return details
+          ? { ...place, label: details.label, ...(details.city ? { city: details.city } : {}) }
+          : place;
       } catch {
         return place;
       }

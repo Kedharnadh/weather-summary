@@ -44,6 +44,10 @@ export interface AirQuality {
   no2: number | null;
   so2: number | null;
   co: number | null;
+  /** Where the headline AQI came from: the CAMS model or a ground monitor. */
+  source?: 'cams' | 'waqi';
+  /** Ground-station name when `source` is "waqi". */
+  station?: string | null;
 }
 
 export interface WeatherSnapshot {
@@ -82,4 +86,6 @@ export interface LocationSettings {
   lat: number;
   lon: number;
   label: string;
+  /** City name for compact chips, when the geocoder provides one. */
+  city?: string;
 }

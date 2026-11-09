@@ -1,4 +1,6 @@
 import type { WeatherFacts } from '../types';
+import { useSettings } from '../SettingsContext';
+import { formatPrecip, formatTemp, formatWind } from '../weather/units';
 import { CardIcon, type CardIconKind } from './CardIcon';
 
 function minutesLabel(minutes: number): string {
@@ -17,6 +19,7 @@ interface Tile {
 }
 
 export function FactsGrid({ facts }: { facts: WeatherFacts }) {
+  const { units } = useSettings();
   const rainNow = facts.isRainingNow
     ? facts.rainStopInMin != null
       ? `Stops in ~${minutesLabel(facts.rainStopInMin)}`
@@ -31,7 +34,7 @@ export function FactsGrid({ facts }: { facts: WeatherFacts }) {
     {
       label: 'Rain now',
       value: rainNow,
-      hint: `${facts.precipNextHourMm.toFixed(1)} mm next hour`,
+      hint: `${formatPrecip(facts.precipNextHourMm, units)} next hour`,
       icon: 'rain',
     },
     {
@@ -42,17 +45,17 @@ export function FactsGrid({ facts }: { facts: WeatherFacts }) {
     },
     {
       label: 'Peak temp',
-      value: facts.peakTemp24h ? `${Math.round(facts.peakTemp24h.tempC)}°` : '—',
+      value: facts.peakTemp24h ? formatTemp(facts.peakTemp24h.tempC, units) : '—',
       hint: facts.peakTemp24h ? `around ${facts.peakTemp24h.at}` : 'next 24 hours',
       icon: 'temperature',
       warm: facts.peakTemp24h != null && facts.peakTemp24h.tempC >= 22,
     },
     {
       label: 'Wind',
-      value: facts.windKmh != null ? `${Math.round(facts.windKmh)} km/h` : '—',
+      value: facts.windKmh != null ? formatWind(facts.windKmh, units) : '—',
       hint:
         facts.windGustKmh != null
-          ? `gusts ${Math.round(facts.windGustKmh)} km/h`
+          ? `gusts ${formatWind(facts.windGustKmh, units)}`
           : '10 m wind',
       icon: 'wind',
     },
@@ -64,7 +67,7 @@ export function FactsGrid({ facts }: { facts: WeatherFacts }) {
     },
     {
       label: 'Feels like',
-      value: facts.feelsC != null ? `${Math.round(facts.feelsC)}°` : '—',
+      value: facts.feelsC != null ? formatTemp(facts.feelsC, units) : '—',
       hint: 'apparent temperature',
       icon: 'feels',
       warm: feels >= 22,

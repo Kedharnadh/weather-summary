@@ -24,19 +24,24 @@ jobs:
       run:
         working-directory: pwa
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: pwa/package-lock.json
 
       - run: npm ci
+
+      # Dev-only advisories in the build toolchain should not block a deploy,
+      # but a vulnerable production dependency must.
+      - run: npm audit --omit=dev --audit-level=high
+
       - run: npm test
       - run: npm run build
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: pwa/dist
 
@@ -48,4 +53,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

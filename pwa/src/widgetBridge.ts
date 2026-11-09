@@ -1,5 +1,8 @@
 import type { LocationSettings, StoredWeather, WeatherFacts } from './types';
+import { loadSettings } from './settings';
+import { displayCity } from './weather/city';
 import { formatUpdated } from './weather/format';
+import { formatTemp } from './weather/units';
 
 const WIDGET_CACHE = 'weather-summary-widget';
 const WIDGET_DATA_PATH = 'widgets/live-data.json';
@@ -21,16 +24,19 @@ export async function publishWidgetData(
   const iconUrl = new URL('icons/icon-192.png', document.baseURI).href;
   const appUrl = new URL('./', document.baseURI).href;
   const facts = stored.facts;
+  const settings = loadSettings();
 
   const payload = {
-    location: location.label,
-    temperature: `${Math.round(facts.tempC)}°`,
+    location: displayCity(location),
+    temperature: formatTemp(facts.tempC, settings.units),
     condition: facts.conditionLabel,
     feels:
-      facts.feelsC != null ? `Feels like ${Math.round(facts.feelsC)}°` : '',
+      facts.feelsC != null
+        ? `Feels like ${formatTemp(facts.feelsC, settings.units)}`
+        : '',
     summary: stored.summary,
     rain: rainLine(facts),
-    updated: `Updated ${formatUpdated(stored.savedAt)}`,
+    updated: `Updated ${formatUpdated(stored.savedAt, settings.clock)}`,
     iconUrl,
     appUrl,
     lat: location.lat,

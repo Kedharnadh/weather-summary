@@ -1,5 +1,7 @@
 import type { CurrentWeather, HourSlice } from '../types';
+import { useSettings } from '../SettingsContext';
 import { formatHour } from '../weather/format';
+import { formatTemp } from '../weather/units';
 import { CardIcon } from './CardIcon';
 import { WeatherIcon, weatherIconKind } from './WeatherIcon';
 
@@ -27,6 +29,7 @@ function currentHourIndex(hours: HourSlice[], startTime?: string | null): number
 }
 
 export function HourlyStrip({ hours, startTime, current }: Props) {
+  const { units, clock } = useSettings();
   const start = currentHourIndex(hours, startTime);
   const visible = hours.slice(start, start + 12);
 
@@ -47,10 +50,10 @@ export function HourlyStrip({ hours, startTime, current }: Props) {
 
           return (
             <article className="hour-tile" key={`${hour.time}-${index}`}>
-              <span className="hour-time">{isNow ? 'Now' : formatHour(hour.time)}</span>
+              <span className="hour-time">{isNow ? 'Now' : formatHour(hour.time, clock)}</span>
               <WeatherIcon kind={weatherIconKind(weatherCode, isDay)} size={42} />
               <span className="hour-temp">
-                {temperature != null ? `${Math.round(temperature)}°` : '—'}
+                {temperature != null ? formatTemp(temperature, units) : '—'}
               </span>
               <span className="hour-rain">
                 {hour.precipProbabilityPct != null ? `${hour.precipProbabilityPct}%` : '—'}

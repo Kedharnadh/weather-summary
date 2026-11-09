@@ -19,12 +19,17 @@ interface WeatherState {
 interface Options {
   /** Skip fetching while the app is still resolving the first location. */
   enabled?: boolean;
+  /** Optional WAQI token for a ground-station AQI reading. */
+  waqiToken?: string;
 }
 
 const AUTO_REFRESH_MS = 10 * 60_000;
+const RETRY_BASE_MS = 30_000;
+const RETRY_MAX_MS = 5 * 60_000;
 
 export function useWeather(location: LocationSettings, options?: Options) {
   const enabled = options?.enabled !== false;
+  const waqiToken = options?.waqiToken?.trim() ?? '';
   const key = locationKey(location.lat, location.lon);
 
   const [state, setState] = useState<WeatherState>(() => {
@@ -39,11 +44,23 @@ export function useWeather(location: LocationSettings, options?: Options) {
   });
   const abortRef = useRef<AbortController | null>(null);
   const lastKey = useRef(key);
+  const retryTimer = useRef<number | null>(null);
+  const failures = useRef(0);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const clearRetry = useCallback(() => {
+    if (retryTimer.current != null) {
+      window.clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
+  }, []);
 
   const refresh = useCallback(
     async (refreshOptions?: { silent?: boolean }) => {
       if (!enabled) return;
 
+      clearRetry();
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -60,7 +77,7 @@ export function useWeather(location: LocationSettings, options?: Options) {
         // block the forecast itself.
         const [snapshot, air] = await Promise.all([
           fetchOpenMeteo(location.lat, location.lon, controller.signal),
-          fetchAirQuality(location.lat, location.lon, controller.signal),
+          fetchAirQuality(location.lat, location.lon, controller.signal, waqiToken),
         ]);
         const facts = deriveFacts(snapshot);
         const stored: StoredWeather = {
@@ -69,11 +86,14 @@ export function useWeather(location: LocationSettings, options?: Options) {
           summary: fallbackSentence(facts),
           savedAt: Date.now(),
         };
+        failures.current = 0;
         setState({ data: stored, loading: false, refreshing: false, error: null, key });
         saveWeatherFor(location, stored);
         void publishWidgetData(stored, location);
       } catch (error) {
         if (controller.signal.aborted) return;
+
+        failures.current += 1;
         const message =
           error instanceof Error ? error.message : 'Could not load the weather.';
         setState((previous) => ({
@@ -82,9 +102,22 @@ export function useWeather(location: LocationSettings, options?: Options) {
           refreshing: false,
           error: message,
         }));
+
+        // Retry automatically with a growing delay while the device is online.
+        const online = typeof navigator === 'undefined' || navigator.onLine;
+        if (online) {
+          const delay = Math.min(
+            RETRY_BASE_MS * 2 ** (failures.current - 1),
+            RETRY_MAX_MS,
+          );
+          retryTimer.current = window.setTimeout(() => {
+            retryTimer.current = null;
+            void refresh();
+          }, delay);
+        }
       }
     },
-    [enabled, key, location.lat, location.lon, location.label],
+    [clearRetry, enabled, key, location.lat, location.lon, location.label, waqiToken],
   );
 
   // When the active place changes, show that place's own cached forecast
@@ -107,8 +140,11 @@ export function useWeather(location: LocationSettings, options?: Options) {
   }, [refresh]);
 
   useEffect(() => {
-    return () => abortRef.current?.abort();
-  }, []);
+    return () => {
+      abortRef.current?.abort();
+      clearRetry();
+    };
+  }, [clearRetry]);
 
   useEffect(() => {
     const onOnline = () => void refresh({ silent: true });
@@ -125,6 +161,23 @@ export function useWeather(location: LocationSettings, options?: Options) {
     return () => window.clearInterval(interval);
   }, [refresh]);
 
+  // Coming back to a stale tab should refresh immediately, not wait for the
+  // next ten-minute tick.
+  useEffect(() => {
+    const onVisible = () => {
+      const data = stateRef.current.data;
+      if (
+        document.visibilityState === 'visible' &&
+        data &&
+        Date.now() - data.savedAt > AUTO_REFRESH_MS
+      ) {
+        void refresh({ silent: true });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refresh]);
+
   const matches = state.key === key;
 
   return {
@@ -133,5 +186,6 @@ export function useWeather(location: LocationSettings, options?: Options) {
     refreshing: matches ? state.refreshing : false,
     error: matches ? state.error : null,
     refresh: () => void refresh({ silent: true }),
+    retry: () => void refresh(),
   };
 }

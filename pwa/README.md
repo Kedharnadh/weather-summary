@@ -11,8 +11,14 @@ An installable, offline-friendly version of Weather Summary built with
 - location details (label, coordinates, timezone) shown with the current weather
 - **starts with your device location** on first open (London is the fallback)
 - **saved locations** with live temperatures, so you can store several places and
-  switch between them in one tap
+  switch between them in one tap; a **Manage** mode reorders, renames, and
+  removes them
 - **location search by place name or pincode**, with reverse-geocoded labels
+- **compact icon header** for Location, Install, Settings, and Refresh
+- **settings** for metric/imperial units, 12/24-hour clock, and an optional
+  ground-station AQI token
+- **offline, retry, update, and stale-forecast states** so the app is honest
+  about the data it is showing
 - a **Windows 11 widget** for the installed PWA (Edge + Widgets Board)
 - cached forecast per location in `localStorage`, so the app still shows data offline
 - installable via the browser's **Add to Home Screen / Install** prompt
@@ -28,7 +34,9 @@ npm install
 npm run dev
 ```
 
-Open the printed local URL. Use **Location** to:
+Open the printed local URL. The header uses compact icon buttons:
+**Location**, **Install** (when available), **Settings**, and **Refresh**. Use
+**Location** to:
 
 - **search by place name or pincode** (for example `Tirupati`, `STV Nagar`, or
   `517501`),
@@ -42,11 +50,30 @@ shows a dismissible notice.
 ## Saved locations
 
 Every place you open (device location, search result, or manual coordinates) is
-added to a **saved-locations strip** under the header. Each chip shows the live
-temperature and condition for that place, fetched in a single batched Open-Meteo
-request, so you can compare several locations at a glance. Tap a chip to switch
-the full forecast; tap **×** to remove it. The active place and its forecast are
-cached per location, so switching works offline too.
+added to a **saved-locations strip** under the header. Each chip shows the city
+name, live temperature, and condition for that place, fetched in a single
+batched Open-Meteo request, so you can compare several locations at a glance.
+Tap a chip to switch the full forecast; tap **×** to remove it. The active place
+and its forecast are cached per location, so switching works offline too.
+
+Open **Manage** on the strip to reorder places, rename them, remove individual
+entries, or clear the whole list. The full place label is still used in the
+summary card and in the chip's hover/accessibility text; only the visible chip
+text is shortened to the city.
+
+## Settings
+
+The **Settings** icon opens a panel stored on the device:
+
+- **Units** — metric (°C, km/h, mm) or imperial (°F, mph, in).
+- **Clock** — follow the device locale, or force 12-hour or 24-hour times.
+- **Ground-station air quality** — paste a free
+  [World Air Quality Index](https://aqicn.org/data-platform/token/) token to
+  prefer a nearby physical monitor for the headline US AQI. The CAMS model still
+  supplies the pollutant breakdown, and the token is only sent to
+  `api.waqi.info`.
+
+The panel also notes that settings and saved places stay in local storage.
 
 ## Data sources
 
@@ -54,6 +81,7 @@ cached per location, so switching works offline too.
 | --- | --- | --- |
 | Current + hourly + 15-minute rain | [Open-Meteo Forecast](https://open-meteo.com/en/docs) | Keyless, CORS-enabled. Requests `daily=sunrise,sunset` and 3 forecast days. |
 | Air quality | [Open-Meteo Air Quality](https://open-meteo.com/en/docs/air-quality-api) | Keyless. European + US AQI plus PM2.5, PM10, O₃, NO₂, SO₂, CO. Best-effort: a failure resolves to `null` and never blocks the forecast. |
+| Ground-station AQI (optional) | [World Air Quality Index](https://aqicn.org/data-platform/token/) | Requires a free token in Settings. A nearby monitor is preferred for the headline US AQI; CAMS remains the fallback. |
 
 Air quality is requested in parallel with the forecast. The card shows a **US
 AQI nowcast** computed from the current pollutant concentrations (the same
@@ -61,7 +89,8 @@ scale live services such as aqi.in display), with the European AQI as a
 secondary reference. Open-Meteo's own `us_aqi` uses 24-hour averages, so it is
 only a fallback. Labels run from Good → Hazardous with short health advice.
 Because the values are model-based (CAMS), they can read slightly lower than a
-nearby ground monitor; the card says so.
+nearby ground monitor; the card says so. When a WAQI token is configured, the
+card prefers the nearby ground monitor and names the station instead.
 
 ## Location search
 
@@ -170,8 +199,10 @@ cannot repaint them. What each platform actually allows:
 
 The Badging API (`navigator.setAppBadge`) can show a small **number**, but it is
 meant for unread counts, is not supported everywhere, and cannot render a
-temperature icon. The reliable surfaces are the **Windows 11 widget** (already
-included), notifications, and the app page itself.
+temperature icon. This app does use it as a best-effort temperature badge on
+Windows taskbars and supported Android launchers (`src/badge.ts`); the value is
+cleared when no forecast is loaded. The reliable surfaces are the **Windows 11
+widget** (already included), notifications, and the app page itself.
 
 ## Deploying to GitHub Pages
 
@@ -197,18 +228,31 @@ follow automatically).
 
 - The app shell is precached by the generated service worker.
 - Open-Meteo forecast and air-quality responses each use a short `NetworkFirst`
-  cache (1 hour).
+  cache (1 hour). Geocoding responses are cached longer (24 hours to 7 days),
+  and WAQI responses for 30 minutes.
 - The last successful snapshot is also saved in `localStorage` **per saved
   location**, so switching places still works when the network is unavailable.
+- When the device goes offline the app shows an offline banner and keeps the
+  last saved forecast. A failed refresh retries automatically with exponential
+  backoff (30 seconds up to 5 minutes) and immediately when the connection
+  returns.
+- A forecast older than an hour is flagged with a **Stale** pill in the footer.
+- New deployments use a **prompt** update flow: the app shows a "new version is
+  ready" banner and only reloads when you choose **Reload**, so a deploy never
+  interrupts what you are doing.
 
 ## PWA limitations
 
 - Browsers do not allow reliable background weather polling. The app refreshes
   when opened, when it comes back online, and every 10 minutes while visible.
 - Geolocation requires HTTPS (or `localhost`) and user permission.
-- This demo does not store API keys because it only uses Open-Meteo.
+- Weather and air-quality data need no API key. The optional WAQI token is
+  stored only in this device's local storage and sent only to `api.waqi.info`.
 - Air quality is best-effort; when the air-quality API is unavailable the card
   shows an "unavailable" message and the rest of the app is unaffected.
+- The manifest adds shortcuts for **Weather where I am** (`?locate=1`) and
+  **Change location** (`?location=1`), available from the installed app's
+  context menu.
 
 ## Next steps
 

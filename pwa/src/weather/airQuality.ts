@@ -274,6 +274,10 @@ export interface AirReading {
   alternates: AirAlternate[];
   /** True when the primary value was derived from current pollutants. */
   estimated: boolean;
+  /** Where the headline reading came from. */
+  source: 'waqi' | 'cams' | 'none';
+  /** Ground-station name when the reading came from WAQI. */
+  station?: string | null;
 }
 
 function europeanAlternate(air: AirQuality): AirAlternate[] {
@@ -286,6 +290,22 @@ function europeanAlternate(air: AirQuality): AirAlternate[] {
 /** Pick the best available index and describe it. */
 export function airReading(air: AirQuality | null | undefined): AirReading {
   if (air) {
+    // A configured ground monitor (WAQI) is the most local source available.
+    if (air.source === 'waqi' && air.usAqi != null && Number.isFinite(air.usAqi)) {
+      const category = usCategory(air.usAqi);
+      return {
+        value: Math.round(air.usAqi),
+        scale: 'US AQI',
+        tone: category.tone,
+        label: category.label,
+        advice: category.advice,
+        alternates: europeanAlternate(air),
+        estimated: false,
+        source: 'waqi',
+        station: air.station ?? null,
+      };
+    }
+
     // Prefer a live US AQI nowcast: it matches what consumer AQI services show.
     const nowcast = usAqiNowcast(air);
     if (nowcast != null) {
@@ -298,6 +318,7 @@ export function airReading(air: AirQuality | null | undefined): AirReading {
         advice: category.advice,
         alternates: europeanAlternate(air),
         estimated: true,
+        source: 'cams',
       };
     }
 
@@ -312,6 +333,7 @@ export function airReading(air: AirQuality | null | undefined): AirReading {
         advice: category.advice,
         alternates: europeanAlternate(air),
         estimated: false,
+        source: 'cams',
       };
     }
 
@@ -326,6 +348,7 @@ export function airReading(air: AirQuality | null | undefined): AirReading {
         advice: category.advice,
         alternates: [],
         estimated: false,
+        source: 'cams',
       };
     }
   }
@@ -338,10 +361,12 @@ export function airReading(air: AirQuality | null | undefined): AirReading {
     advice: UNKNOWN.advice,
     alternates: [],
     estimated: false,
+    source: 'none',
   };
 }
 
 const AIR_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+const WAQI_URL = 'https://api.waqi.info/feed';
 
 const AIR_FIELDS = [
   'european_aqi',
@@ -358,11 +383,7 @@ function num(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-/**
- * Fetch the current air quality. Any failure (network, CORS, quota) resolves to
- * `null` so the weather summary still renders without the air-quality card.
- */
-export async function fetchAirQuality(
+async function fetchCams(
   lat: number,
   lon: number,
   signal?: AbortSignal,
@@ -391,8 +412,112 @@ export async function fetchAirQuality(
       no2: num(cur.nitrogen_dioxide),
       so2: num(cur.sulphur_dioxide),
       co: num(cur.carbon_monoxide),
+      source: 'cams',
     };
   } catch {
     return null;
   }
+}
+
+interface WaqiResponse {
+  status?: string;
+  data?: {
+    aqi?: number | string;
+    city?: { name?: string };
+    time?: { iso?: string; s?: string };
+    iaqi?: Record<string, { v?: number }>;
+  };
+}
+
+interface GroundReading {
+  aqi: number;
+  station: string | null;
+  time: string;
+  pm25: number | null;
+}
+
+/**
+ * Optional ground-station reading from the World Air Quality Index project.
+ * A free token is required; failures fall back to the CAMS model silently.
+ */
+async function fetchWaqi(
+  lat: number,
+  lon: number,
+  token: string,
+  signal?: AbortSignal,
+): Promise<GroundReading | null> {
+  const url = `${WAQI_URL}/geo:${lat};${lon}/?token=${encodeURIComponent(token)}`;
+
+  try {
+    const response = await fetch(url, { signal });
+    if (!response.ok) return null;
+
+    const body = (await response.json()) as WaqiResponse;
+    if (body.status !== 'ok' || !body.data) return null;
+
+    const aqi = typeof body.data.aqi === 'number' ? body.data.aqi : Number(body.data.aqi);
+    if (!Number.isFinite(aqi)) return null;
+
+    const time =
+      typeof body.data.time?.iso === 'string'
+        ? body.data.time.iso
+        : typeof body.data.time?.s === 'string'
+          ? body.data.time.s.replace(' ', 'T')
+          : '';
+
+    return {
+      aqi: Math.round(aqi),
+      station: body.data.city?.name?.trim() || null,
+      time,
+      pm25: num(body.data.iaqi?.pm25?.v),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch the current air quality. Any failure (network, CORS, quota) resolves to
+ * `null` so the weather summary still renders without the air-quality card.
+ *
+ * When a WAQI token is configured, a nearby ground monitor is preferred for the
+ * headline US AQI; the CAMS model still supplies the pollutant breakdown.
+ */
+export async function fetchAirQuality(
+  lat: number,
+  lon: number,
+  signal?: AbortSignal,
+  waqiToken?: string,
+): Promise<AirQuality | null> {
+  const token = waqiToken?.trim();
+  const [cams, ground] = await Promise.all([
+    fetchCams(lat, lon, signal),
+    token ? fetchWaqi(lat, lon, token, signal) : Promise.resolve(null),
+  ]);
+
+  if (!cams && !ground) return null;
+
+  const base: AirQuality = cams ?? {
+    time: '',
+    europeanAqi: null,
+    usAqi: null,
+    pm25: null,
+    pm10: null,
+    ozone: null,
+    no2: null,
+    so2: null,
+    co: null,
+    source: 'cams',
+  };
+
+  if (!ground) return base;
+
+  return {
+    ...base,
+    time: ground.time || base.time,
+    usAqi: ground.aqi,
+    pm25: ground.pm25 ?? base.pm25,
+    source: 'waqi',
+    station: ground.station,
+  };
 }

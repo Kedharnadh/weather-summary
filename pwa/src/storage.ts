@@ -11,6 +11,12 @@ const LEGACY_LOCATION_KEY = 'weather-summary:location';
 /** Upper bound so the saved-locations strip stays manageable. */
 export const MAX_SAVED_LOCATIONS = 12;
 
+/** Coordinates closer than this are treated as the same saved place. */
+export const SAME_PLACE_KM = 0.5;
+
+/** How far a device location may be from a saved city center and still match. */
+export const SAME_CITY_KM = 75;
+
 /** Demo default so the app still shows something if geolocation is denied. */
 export const DEFAULT_LOCATION: LocationSettings = {
   lat: 51.5072,
@@ -21,6 +27,79 @@ export const DEFAULT_LOCATION: LocationSettings = {
 /** Stable identity for a location, tolerant of tiny coordinate differences. */
 export function locationKey(lat: number, lon: number): string {
   return `${lat.toFixed(4)},${lon.toFixed(4)}`;
+}
+
+/** Great-circle distance in kilometres between two locations. */
+export function distanceKm(
+  a: Pick<LocationSettings, 'lat' | 'lon'>,
+  b: Pick<LocationSettings, 'lat' | 'lon'>,
+): number {
+  const earthRadiusKm = 6371;
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRadians(b.lat - a.lat);
+  const dLon = toRadians(b.lon - a.lon);
+  const lat1 = toRadians(a.lat);
+  const lat2 = toRadians(b.lat);
+
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+
+  return 2 * earthRadiusKm * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+interface MatchOptions {
+  /** Proximity threshold in kilometres. Defaults to [SAME_PLACE_KM]. */
+  maxKm?: number;
+  /** Also treat a matching city name as the same place. */
+  matchCity?: boolean;
+  /** Maximum distance for a city-name match. Defaults to [SAME_CITY_KM]. */
+  maxCityKm?: number;
+}
+
+/**
+ * Find an existing saved place that represents the same location.
+ *
+ * Exact coordinates win, then a close-by coordinate. A city-name match is only
+ * used when explicitly requested (for device locations), because two saved
+ * neighbourhoods in the same city should stay distinct otherwise.
+ */
+export function findSavedMatch(
+  list: LocationSettings[],
+  target: LocationSettings,
+  options: MatchOptions = {},
+): LocationSettings | null {
+  const key = locationKey(target.lat, target.lon);
+  const exact = list.find((item) => locationKey(item.lat, item.lon) === key);
+  if (exact) return exact;
+
+  const maxKm = options.maxKm ?? SAME_PLACE_KM;
+  let nearest: LocationSettings | null = null;
+  let nearestDistance = Infinity;
+
+  for (const item of list) {
+    const distance = distanceKm(item, target);
+    if (distance <= maxKm && distance < nearestDistance) {
+      nearest = item;
+      nearestDistance = distance;
+    }
+  }
+  if (nearest) return nearest;
+
+  if (options.matchCity && target.city) {
+    const city = target.city.trim().toLowerCase();
+    const maxCityKm = options.maxCityKm ?? SAME_CITY_KM;
+    if (city) {
+      const candidates = list
+        .filter((item) => item.city?.trim().toLowerCase() === city)
+        .map((item) => ({ item, distance: distanceKm(item, target) }))
+        .filter(({ distance }) => distance <= maxCityKm)
+        .sort((a, b) => a.distance - b.distance);
+      if (candidates.length > 0) return candidates[0].item;
+    }
+  }
+
+  return null;
 }
 
 export function isSameLocation(a: LocationSettings, b: LocationSettings): boolean {
@@ -38,11 +117,14 @@ function parseLocation(raw: string | null): LocationSettings | null {
     if (typeof parsed.lat !== 'number' || typeof parsed.lon !== 'number') return null;
     if (!Number.isFinite(parsed.lat) || !Number.isFinite(parsed.lon)) return null;
     const label = typeof parsed.label === 'string' ? parsed.label.trim() : '';
-    return {
+    const city = typeof parsed.city === 'string' ? parsed.city.trim() : '';
+    const location: LocationSettings = {
       lat: parsed.lat,
       lon: parsed.lon,
       label: label || coordinateLabel(parsed.lat, parsed.lon),
     };
+    if (city) location.city = city;
+    return location;
   } catch {
     return null;
   }

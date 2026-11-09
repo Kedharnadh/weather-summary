@@ -1,3 +1,5 @@
+import type { ClockFormat } from '../settings';
+
 /** Parse an Open-Meteo local timestamp ("YYYY-MM-DDTHH:mm") or a full ISO date. */
 export function parseWeatherTime(value: string): Date | null {
   if (!value) return null;
@@ -6,21 +8,31 @@ export function parseWeatherTime(value: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function formatHour(value: string): string {
+function hour12For(clock: ClockFormat): boolean | undefined {
+  if (clock === '12') return true;
+  if (clock === '24') return false;
+  return undefined;
+}
+
+/**
+ * Format a location-local timestamp. Open-Meteo returns naive local strings,
+ * so parsing them as device-local keeps the wall-clock hour the location sees.
+ */
+export function formatHour(value: string, clock: ClockFormat = '24'): string {
   const date = parseWeatherTime(value);
   if (!date) return '?';
   return new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    hour12: hour12For(clock),
   }).format(date);
 }
 
-export function formatUpdated(timestamp: number): string {
+export function formatUpdated(timestamp: number, clock: ClockFormat = '24'): string {
   return new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    hour12: hour12For(clock),
   }).format(new Date(timestamp));
 }
 

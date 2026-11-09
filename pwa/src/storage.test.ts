@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_LOCATION,
   MAX_SAVED_LOCATIONS,
+  SAME_CITY_KM,
+  distanceKm,
+  findSavedMatch,
   isSameLocation,
   loadActiveLocation,
   loadLocations,
@@ -98,6 +101,40 @@ describe('location identity', () => {
     expect(locationKey(51.50721, -0.12761)).toBe(locationKey(51.5072, -0.1276));
     expect(isSameLocation(place(51.5072, -0.1276), place(51.50721, -0.12761))).toBe(true);
     expect(isSameLocation(place(51.5, -0.12), place(52.5, -0.12))).toBe(false);
+  });
+
+  it('measures great-circle distance between places', () => {
+    const london = place(51.5072, -0.1276);
+    const paris = place(48.8566, 2.3522);
+    expect(distanceKm(london, paris)).toBeCloseTo(343.5, 0);
+    expect(distanceKm(london, london)).toBe(0);
+  });
+});
+
+describe('saved place matching', () => {
+  const tirupati = { ...place(13.6288, 79.4192, 'Tirupati, India'), city: 'Tirupati' };
+
+  it('matches a device fix close to a saved place', () => {
+    // A device fix a few hundred metres from the saved city centre.
+    const fix = { ...place(13.632, 79.421, 'My location'), city: 'Tirupati' };
+    expect(findSavedMatch([tirupati], fix)).toBe(tirupati);
+  });
+
+  it('matches a device fix in the same city when requested', () => {
+    // Roughly 10 km away, but clearly the same city.
+    const fix = { ...place(13.72, 79.42, 'My location'), city: 'Tirupati' };
+    expect(findSavedMatch([tirupati], fix)).toBeNull();
+    expect(findSavedMatch([tirupati], fix, { matchCity: true })).toBe(tirupati);
+  });
+
+  it('does not merge a same-named city that is too far away', () => {
+    const fix = { ...place(13.6288 + SAME_CITY_KM / 50, 79.4192, 'My location'), city: 'Tirupati' };
+    expect(findSavedMatch([tirupati], fix, { matchCity: true })).toBeNull();
+  });
+
+  it('does not merge a different city', () => {
+    const chennai = { ...place(13.0827, 80.2707, 'Chennai, India'), city: 'Chennai' };
+    expect(findSavedMatch([tirupati], chennai, { matchCity: true })).toBeNull();
   });
 });
 

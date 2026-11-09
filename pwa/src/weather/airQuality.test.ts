@@ -84,7 +84,26 @@ describe('airReading', () => {
     expect(reading.tone).toBe('very-poor');
     expect(reading.label).toBe('Unhealthy');
     expect(reading.estimated).toBe(true);
+    expect(reading.source).toBe('cams');
     expect(reading.alternates).toEqual([{ scale: 'European AQI', value: 67 }]);
+  });
+
+  it('prefers a WAQI ground monitor for the headline AQI', () => {
+    const reading = airReading(
+      air({
+        usAqi: 160,
+        europeanAqi: 67,
+        pm25: 68,
+        source: 'waqi',
+        station: 'Tirupati - TMC',
+      }),
+    );
+    expect(reading.value).toBe(160);
+    expect(reading.scale).toBe('US AQI');
+    expect(reading.tone).toBe('very-poor');
+    expect(reading.estimated).toBe(false);
+    expect(reading.source).toBe('waqi');
+    expect(reading.station).toBe('Tirupati - TMC');
   });
 
   it('falls back to the 24-hour US index without pollutants', () => {
